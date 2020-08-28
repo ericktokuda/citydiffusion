@@ -26,6 +26,7 @@ from torch.nn import functional as F
 from scipy import signal, stats
 import h5py
 import pandas as pd
+from myutils import info, create_readme
 
 CUDA = torch.cuda.is_available()
 
@@ -153,6 +154,8 @@ def main():
     args = parser.parse_args()
 
     if not os.path.isdir(args.outdir): os.mkdir(args.outdir)
+    readmepath = create_readme(sys.argv, args.outdir)
+
     if (args.kersize %2) != 1: info('Please provide an ODD diameter'); return
     ndims = 2
     if CUDA: info('Using cuda:{}')
@@ -199,16 +202,6 @@ def main():
             outdir  = row[6]))
 
     outpath = pjoin(args.outdir, 'README.csv')
-    fh = open(outpath, 'w')
-    fh.write('#Diffusion\n')
-    fh.write('#call:python ' + ' '.join(sys.argv) + '\n')
-    fh.write('origsize,{}x{}\n'.format(h, w))
-    fh.write('samplesize,{}x{}\n'.format(labels0.shape[0], labels0.shape[1]))
-    fh.write('kersize,{}\n'.format(args.kersize))
-    fh.write('kerstd,{}\n'.format(args.kerstd))
-    fh.write('niter,{}\n'.format(args.niter))
-    fh.close()
-
     del labels0
 
     respaths = [run_experiment(p) for p in params]
