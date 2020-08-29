@@ -70,7 +70,7 @@ def colours_to_labels_from_first_coord(map_):
 ##########################################################
 def conv_gpu(ker, map_):
     """Correlate in gpu """
-    info(inspect.stack()[0][3] + '()')
+    # info(inspect.stack()[0][3] + '()')
     imgSize = map_.shape[0]
 
     filt = torch.from_numpy(ker).type(torch.float32)
@@ -122,6 +122,7 @@ def run_experiment(params_):
 
     z = labels.copy()
     for i in range(niter+1):
+        info('i:{}'.format(i))
         if outfmt in ['png', 'both']:
             outpath = pjoin(outdir, '{:02d}.png'.format(i))
             fig = plt.figure(figsize=(20, 20))
