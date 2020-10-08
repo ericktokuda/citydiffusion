@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 from myutils import info, create_readme
 import scipy; from scipy.signal import convolve2d
 import imageio
+from myutils import plot
 
 ##########################################################
 def get_kernel(kerdiam, kerstd, outdir):
@@ -27,16 +28,28 @@ def get_kernel(kerdiam, kerstd, outdir):
     return ker2d
 
 ##########################################################
-def diffuse_with_source(imorig, ker2d, refpoints, nsteps, label, outdir):
+def diffuse_with_source(imorig, ker2d, refpoints, nsteps, label, palette, outdir):
     """Profile value of @refpoints with diffusion with source"""
     info(inspect.stack()[0][3] + '()')
     im = imorig.copy()
     profile = np.zeros((nsteps, len(refpoints)), dtype=float)
+    colours = plot.hex2rgb(palette)
+    r = 3
+
     for i in range(nsteps):
         im = convolve2d(im, ker2d, mode='same')
-        im[np.where(imorig == 1)] = 1
+        im[np.where(imorig == 1)] = 1 # Source
         outpath = pjoin(outdir, '{}_{:02d}.png'.format(label, i))
         imageio.imwrite(outpath, im)
+
+        
+        colpath = pjoin(outdir, '{}_{:02d}_col.png'.format(label, i))
+        colored = np.ones((imorig.shape[0], imorig.shape[1], 3), dtype=np.uint8)
+        for j in range(3): colored[:, :, j] = im * 255
+        for j, p in enumerate(refpoints):
+            colored[p[0]-r:p[0]+r, p[1]-r:p[1]+r, :] = colours[j]
+        imageio.imwrite(colpath, colored)
+
         for j, p in enumerate(refpoints):
             x, y = p
             profile[i, j] = im[x, y]
@@ -52,6 +65,7 @@ def plot_signatures(outdir):
     m = int(1.5 * nquart)
     nsteps = 10
     l = 8
+    palette = plot.palettes['pastel']
 
     refpoints = (np.array([
                 [1/4, 1/2],
@@ -62,13 +76,14 @@ def plot_signatures(outdir):
     ker2d =  get_kernel(kerdiam=int(n/5), kerstd=int(n/5), outdir=outdir)
 
     im = np.ones((n, n), dtype=np.uint8); im[nquart:-nquart, nquart:-nquart] = 0
-    prof = diffuse_with_source(im, ker2d, refpoints, nsteps, 'A', outdir)
+    prof = diffuse_with_source(im, ker2d, refpoints, nsteps, 'A', palette, outdir)
     fig, axs = plt.subplots(1, 1, figsize=(l, l))
-    for j in range(prof.shape[1]): axs.plot(range(nsteps), prof[:, j], label=str(j))
+    for j in range(prof.shape[1]):
+        axs.plot(range(nsteps), prof[:, j], c=palette[j], label=str(j))
     axs.legend(); plt.savefig(pjoin(outdir, 'A.png'))
 
     im = np.ones((n, n), dtype=np.uint8); im[nquart:-nquart, m:-m] = 0
-    prof = diffuse_with_source(im, ker2d, refpoints, nsteps, 'B', outdir)
+    prof = diffuse_with_source(im, ker2d, refpoints, nsteps, 'B', palette, outdir)
     fig, axs = plt.subplots(1, 1, figsize=(l, l))
     for j in range(prof.shape[1]): axs.plot(range(nsteps), prof[:, j], label=str(j))
     axs.legend(); plt.savefig(pjoin(outdir, 'B.png'))
