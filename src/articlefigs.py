@@ -37,18 +37,17 @@ def diffuse_with_source(imorig, ker2d, refpoints, nsteps, label, palette, outdir
     r = 3
 
     for i in range(nsteps):
-        im = convolve2d(im, ker2d, mode='same')
-        im[np.where(imorig == 1)] = 1 # Source
         outpath = pjoin(outdir, '{}_{:02d}.png'.format(label, i))
-        imageio.imwrite(outpath, im)
-
-        
+        # imageio.imwrite(outpath, im)
         colpath = pjoin(outdir, '{}_{:02d}_col.png'.format(label, i))
         colored = np.ones((imorig.shape[0], imorig.shape[1], 3), dtype=np.uint8)
         for j in range(3): colored[:, :, j] = im * 255
         for j, p in enumerate(refpoints):
             colored[p[0]-r:p[0]+r, p[1]-r:p[1]+r, :] = colours[j]
         imageio.imwrite(colpath, colored)
+
+        im = convolve2d(im, ker2d, mode='same')
+        im[np.where(imorig == 1)] = 1 # Source
 
         for j, p in enumerate(refpoints):
             x, y = p
@@ -63,7 +62,7 @@ def plot_signatures(outdir):
     n = 301
     nquart = int(n / 4)
     m = int(1.5 * nquart)
-    nsteps = 10
+    nsteps = 30
     l = 8
     palette = plot.palettes['pastel']
 
@@ -80,12 +79,17 @@ def plot_signatures(outdir):
     fig, axs = plt.subplots(1, 1, figsize=(l, l))
     for j in range(prof.shape[1]):
         axs.plot(range(nsteps), prof[:, j], c=palette[j], label=str(j))
+        axs.set_xlabel('Time')
+        axs.set_ylabel('Green index')
     axs.legend(); plt.savefig(pjoin(outdir, 'A.png'))
 
     im = np.ones((n, n), dtype=np.uint8); im[nquart:-nquart, m:-m] = 0
     prof = diffuse_with_source(im, ker2d, refpoints, nsteps, 'B', palette, outdir)
     fig, axs = plt.subplots(1, 1, figsize=(l, l))
-    for j in range(prof.shape[1]): axs.plot(range(nsteps), prof[:, j], label=str(j))
+    for j in range(prof.shape[1]):
+        axs.plot(range(nsteps), prof[:, j], label=str(j))
+        axs.set_xlabel('Time')
+        axs.set_ylabel('Green index')
     axs.legend(); plt.savefig(pjoin(outdir, 'B.png'))
       
 ##########################################################
