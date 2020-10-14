@@ -154,7 +154,7 @@ def main():
     parser.add_argument('--outdir', default='/tmp/out/', help='Output directory')
     args = parser.parse_args()
 
-    if not os.path.isdir(args.outdir): os.mkdir(args.outdir)
+    os.makedirs(args.outdir, exist_ok=True)
     readmepath = create_readme(sys.argv, args.outdir)
 
     if (args.kersize %2) != 1: info('Please provide an ODD diameter'); return
