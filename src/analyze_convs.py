@@ -4,11 +4,10 @@
 
 import argparse
 import time
-import os
+import os, sys
 from os.path import join as pjoin
 import inspect
 
-import sys
 import numpy as np
 from itertools import product
 import matplotlib; matplotlib.use('Agg')
@@ -17,11 +16,7 @@ from datetime import datetime
 import pandas as pd
 import h5py
 from scipy import ndimage
-
-#############################################################
-def info(*args):
-    pref = datetime.now().strftime('[%y%m%d %H:%M:%S]')
-    print(pref, *args, file=sys.stdout)
+from myutils import info, create_readme
 
 ##########################################################
 def hdf2numpy(hdfpath):
@@ -37,11 +32,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--hdfdir', default='/tmp/out/', help='Hdf5 directory')
     parser.add_argument('--minpix', type=float, default=-1, help='Min pixel value')
+    parser.add_argument('--kersize', type=float, required=True, help='Kernel size that was used in the convolution')
     parser.add_argument('--outdir', default='/tmp/out/', help='Output directory')
     args = parser.parse_args()
 
-    if not os.path.isdir(args.outdir): os.mkdir(args.outdir)
-    open(pjoin(args.outdir, 'call'), 'w').write('#python ' + ' '.join(sys.argv))
+    os.makedirs(args.outdir, exist_ok=True)
+    readmepath = create_readme(sys.argv, args.outdir)
 
     files = sorted(os.listdir(args.hdfdir))
     stds = []
@@ -49,8 +45,7 @@ def main():
         if not f.endswith('.hdf5'): continue
         stds.append(int(f.replace('.hdf5', '')))
 
-    df = pd.read_csv(pjoin(args.hdfdir, 'README.csv'), comment='#', header=None)
-    kersize = int(df[df[0]=='kersize'][1].values[0])
+    kersize = 501
 
     mask0 = hdf2numpy(pjoin(args.hdfdir, '00.hdf5'))
     h, w = mask0.shape

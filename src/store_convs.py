@@ -164,18 +164,19 @@ def main():
     
     PIL.Image.MAX_IMAGE_PIXELS = 360000000
     labelspath = pjoin(args.outdir, 'labels.npy')
-    if not os.path.exists(labelspath):
+    # if not os.path.exists(labelspath):
+    if True:
         map_ = np.asarray(Image.open(args.mask))
         labels0 = colours_to_labels_from_first_coord(map_)
         np.save(labelspath, labels0)
-    else:
-        labels0 = np.load(open(labelspath, 'rb'))
+    # else:
+        # labels0 = np.load(open(labelspath, 'rb'))
 
     h, w = labels0.shape
     samplesz = args.samplesz
 
     info('labels.shape:{}'.format(labels0.shape))
-    info('sample size:{0}x{0}'.format(samplesz))
+    info('samplesz:{}'.format(samplesz))
 
     if samplesz > 0 and samplesz < h and samplesz < w:
         margin = [(h - samplesz) // 2, (w - samplesz) // 2]
