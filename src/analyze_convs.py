@@ -58,16 +58,17 @@ def parse_urban_mask(maskpath, maskshape):
     info(inspect.stack()[0][3] + '()')
 
     if maskpath:
-        mask = imageio.imread(maskpath)
-        mask = (mask > 128)[0]
+        mask = imageio.imread(maskpath)[:, :, 0]
+        mask = (mask > 128)
     else:
         mask = np.ones(maskshape, dtype=bool)
 
     import cv2
 
-    borderpts, _ = cv2.findContours(mask.astype(np.uint8),
+    borderpts, aux = cv2.findContours(mask.astype(np.uint8),
             cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    return borderpts, mask
+    
+    return np.array(borderpts), mask
 
 ##########################################################
 def plot_contour(maskpath):
@@ -76,12 +77,12 @@ def plot_contour(maskpath):
 
     import cv2
     im = cv2.imread(maskpath)
-    breakpoint()
 
     imgray = cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
     ret,thresh = cv2.threshold(imgray,127,255,0)
     image, contours, hierarchy = cv2.findContours(thresh,
             cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+
 ##########################################################
 def plot_threshold(minpixarg, hdfdir, mask0, urbanmaskarg, figsize, outpath):
     """Plot the required time of the pixels of a map to achieve a minimum value"""
@@ -102,7 +103,7 @@ def plot_threshold(minpixarg, hdfdir, mask0, urbanmaskarg, figsize, outpath):
     urbanborder, urbanmask = parse_urban_mask(urbanmaskarg, mask0.shape)
 
     steps = -10*np.ones(mask0.shape, dtype=float) # Num steps to achieve minpix
-    
+
     info('Traversing backwards...')
     nstds = len(stds)
     for i, std in enumerate(sorted(stds, reverse=True)): # Traverse backwards
@@ -110,8 +111,8 @@ def plot_threshold(minpixarg, hdfdir, mask0, urbanmaskarg, figsize, outpath):
         info('diff step:{}'.format(std))
         mask = hdf2numpy(pjoin(hdfdir, '{:02d}.hdf5'.format(std)))
         inds = np.where(mask >= minpix)
+        
         steps[inds] = k # Keep the minimum time to achieve minpix
-        # if i > 10: break #TODO: REMOVE THIS
 
     # from matplotlib import cm
     # from matplotlib.colors import ListedColormap, LinearSegmentedColormap
@@ -122,9 +123,15 @@ def plot_threshold(minpixarg, hdfdir, mask0, urbanmaskarg, figsize, outpath):
             # cmap=mycmap,
             # norm=matplotlib.colors.LogNorm(vmin=steps.min(), vmax=steps.max()),
             )
-    ax.set_title('Initial mean:{:.02f}, threshold:{:.02f}'. \
-            format(np.mean(mask0), minpix))
-    fig.colorbar(im)
+
+    for aux in urbanborder:
+        ax.plot(aux[:, 0, 0], aux[:, 0, 1], c='gray')
+
+    ax.set_axis_off()
+    # ax.set_title('Initial mean:{:.02f}, threshold:{:.02f}'. \
+            # format(np.mean(mask0), minpix))
+    cbar = fig.colorbar(im, ax=ax, fraction=0.04, pad=0.05)
+    cbar.set_label('Time (steps)', labelpad=5, rotation=-90)
     plt.savefig(outpath)
 
 ##########################################################
@@ -141,14 +148,15 @@ def main():
     os.makedirs(args.outdir, exist_ok=True)
     readmepath = create_readme(sys.argv, args.outdir)
 
-    W = 640; H = 480; figsize=(W*.01, H*.01)
+    W = 600; H = 800; figsize=(W*.01, H*.01)
 
     mask0 = hdf2numpy(pjoin(args.hdfdir, '00.hdf5'))
 
-    distpath = pjoin(args.outdir, 'distransform.png')
+    distpath = pjoin(args.outdir, 'distransform.pdf')
     # plot_disttransform(figsize, mask0, distpath)
 
-    threshpath = pjoin(args.outdir, 'diffusion_{:03d}'.format(int(args.minpix*100)))
+    threshpath = pjoin(args.outdir, 'diffusion_{:03d}.pdf'. \
+            format(int(args.minpix*100)))
     plot_threshold(args.minpix, args.hdfdir, mask0, args.urbanmask,
             figsize, threshpath)
 
