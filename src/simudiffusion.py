@@ -103,7 +103,8 @@ def run_experiment(params_):
     diam = params_['kersize']
     std = params_['kerstd']
     ndims = params_['ndims']
-    niter = params_['niter']
+    eps = params_['eps']
+    maxiter = params_['maxiter']
     outfmt = params_['outfmt']
     outdir = params_['outdir']
     r = int(diam/2)
@@ -120,24 +121,26 @@ def run_experiment(params_):
     plt.savefig(pjoin(outdir, 'kernel.png'))
     plt.close()
 
-    z = labels.copy()
-    for i in range(niter+1):
+    zold = labels.copy()
+    for i in range(maxiter+1):
         info('i:{}'.format(i))
         if outfmt in ['png', 'both']:
             outpath = pjoin(outdir, '{:02d}.png'.format(i))
             fig = plt.figure(figsize=(20, 20))
-            plt.imshow(z[r:-r,r:-r], cmap='gray'); plt.savefig(outpath)
+            plt.imshow(zold[r:-r,r:-r], cmap='gray'); plt.savefig(outpath)
             plt.close()
         if outfmt in ['hdf5', 'both']:
             outpath = pjoin(outdir, '{:02d}.hdf5'.format(i))
             with h5py.File(outpath, "w") as f:
-                dset = f.create_dataset("data", data=z[r:-r,r:-r], dtype='f')
+                dset = f.create_dataset("data", data=zold[r:-r,r:-r], dtype='f')
 
-        if CUDA: z =  conv_gpu(ker2d, z)
-        else: z = convolve2d(z, ker2d, mode='same')
+        if CUDA: z =  conv_gpu(ker2d, zold)
+        else: z = convolve2d(zold, ker2d, mode='same')
         z[np.where(labels == 1)] = 1
- 
-    return outpath
+        if i > 0 and np.linalg.norm(z - zold) < eps: break
+        else: zold = z
+
+    return i
 
 ##########################################################
 def main():
@@ -149,7 +152,6 @@ def main():
     parser.add_argument('--kersize', default=15, type=int, help='Kernel size (odd integer value)')
     parser.add_argument('--kerstd', default=5, type=int, help='Standard deviation (int)')
     parser.add_argument('--samplesz', default=-1, type=int, help='sample size')
-    parser.add_argument('--niter', default=40, type=int, help='Number of iterations')
     parser.add_argument('--outfmt', default='both', help='Output format (png,hdf5,both)')
     parser.add_argument('--outdir', default='/tmp/out/', help='Output directory')
     args = parser.parse_args()
@@ -161,7 +163,7 @@ def main():
     ndims = 2
     if CUDA: info('Using cuda:{}')
     else: info('NOT using cuda:{}')
-    
+
     PIL.Image.MAX_IMAGE_PIXELS = 360000000
     labelspath = pjoin(args.outdir, 'labels.npy')
     # if not os.path.exists(labelspath):
@@ -174,6 +176,8 @@ def main():
 
     h, w = labels0.shape
     samplesz = args.samplesz
+    eps = 10
+    maxiter = 100
 
     info('labels.shape:{}'.format(labels0.shape))
     info('samplesz:{}'.format(samplesz))
@@ -189,8 +193,8 @@ def main():
     labels[pad:-pad, pad:-pad] = labels0
 
     info('kerstd:{}'.format(args.kerstd))
-    aux = list(product([labels], [args.kersize], [args.kerstd], [args.niter], [ndims],
-        [args.outfmt], [args.outdir],))
+    aux = list(product([labels], [args.kersize], [args.kerstd], [eps],
+                       [maxiter], [ndims], [args.outfmt], [args.outdir],))
 
     params = []
     for i, row in enumerate(aux):
@@ -198,20 +202,20 @@ def main():
             labels = row[0],
             kersize = row[1],
             kerstd = row[2],
-            niter = row[3],
-            ndims = row[4],
-            outfmt  = row[5],
-            outdir  = row[6]))
+            eps = row[3],
+            maxiter = row[4],
+            ndims = row[5],
+            outfmt  = row[6],
+            outdir  = row[7]))
 
     outpath = pjoin(args.outdir, 'README.csv')
     del labels0
 
-    respaths = [run_experiment(p) for p in params]
-    
-    info('respaths:{}'.format(respaths))
+    lastiters = [run_experiment(p) for p in params]
+    info('lastiters:{}'.format(lastiters))
 
     info('Elapsed time:{}'.format(time.time()-t0))
-    
+
 ##########################################################
 if __name__ == "__main__":
     main()
