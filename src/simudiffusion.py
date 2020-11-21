@@ -26,7 +26,7 @@ from torch.nn import functional as F
 from scipy import signal, stats
 import h5py
 import pandas as pd
-from myutils import info, create_readme
+from myutils import info, create_readme, append_to_file
 
 CUDA = torch.cuda.is_available()
 #CUDA=False
@@ -166,6 +166,7 @@ def main():
 
     info('labels.shape:{}'.format(labels0.shape))
     info('samplesz:{}'.format(samplesz))
+    info('kerstd:{}'.format(args.kerstd))
 
     if samplesz > 0 and samplesz < h and samplesz < w:
         margin = [(h - samplesz) // 2, (w - samplesz) // 2]
@@ -177,14 +178,13 @@ def main():
     labels = np.ones((labels0.shape[0]+2*pad, labels0.shape[1]+2*pad), dtype=int)
     labels[pad:-pad, pad:-pad] = labels0
 
-    info('kerstd:{}'.format(args.kerstd))
-
     outpath = pjoin(args.outdir, 'README.csv')
     del labels0
 
-    run_experiment(labels, args.kersize, args.kerstd,
-            eps, maxiter, args.outfmt, args.outdir)
-    info('lastiters:{}'.format(lastiters))
+    lastiter = run_experiment(labels, args.kersize, args.kerstd, eps,
+                              maxiter, args.outfmt, args.outdir)
+    info('lastiter:{}'.format(lastiter))
+    append_to_file(readmepath, 'lastiter:{}'.format(lastiter))
 
     info('Elapsed time:{}'.format(time.time()-t0))
 
