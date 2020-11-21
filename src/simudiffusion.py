@@ -29,6 +29,7 @@ import pandas as pd
 from myutils import info, create_readme
 
 CUDA = torch.cuda.is_available()
+#CUDA=False
 
 #############################################################
 def info(*args):
@@ -98,15 +99,7 @@ def conv_gpu(ker, map_):
     return imgout.cpu().numpy()[0][0]
 
 #############################################################
-def run_experiment(params_):
-    labels = params_['labels']
-    diam = params_['kersize']
-    std = params_['kerstd']
-    ndims = params_['ndims']
-    eps = params_['eps']
-    maxiter = params_['maxiter']
-    outfmt = params_['outfmt']
-    outdir = params_['outdir']
+def run_experiment(labels, diam, std, eps, maxiter, outfmt, outdir):
     r = int(diam/2)
 
     h, w = labels.shape
@@ -147,7 +140,6 @@ def main():
     info(inspect.stack()[0][3] + '()')
     t0 = time.time()
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--nprocs', default=1, type=int, help='num procs')
     parser.add_argument('--mask', default='data/toy02.png', help='Mask path')
     parser.add_argument('--kersize', default=15, type=int, help='Kernel size (odd integer value)')
     parser.add_argument('--kerstd', default=5, type=int, help='Standard deviation (int)')
@@ -160,19 +152,12 @@ def main():
     readmepath = create_readme(sys.argv, args.outdir)
 
     if (args.kersize %2) != 1: info('Please provide an ODD diameter'); return
-    ndims = 2
     if CUDA: info('Using cuda:{}')
     else: info('NOT using cuda:{}')
 
     PIL.Image.MAX_IMAGE_PIXELS = 360000000
-    labelspath = pjoin(args.outdir, 'labels.npy')
-    # if not os.path.exists(labelspath):
-    if True:
-        map_ = np.asarray(Image.open(args.mask))
-        labels0 = colours_to_labels_from_first_coord(map_)
-        np.save(labelspath, labels0)
-    # else:
-        # labels0 = np.load(open(labelspath, 'rb'))
+    map_ = np.asarray(Image.open(args.mask))
+    labels0 = colours_to_labels_from_first_coord(map_)
 
     h, w = labels0.shape
     samplesz = args.samplesz
@@ -193,25 +178,12 @@ def main():
     labels[pad:-pad, pad:-pad] = labels0
 
     info('kerstd:{}'.format(args.kerstd))
-    aux = list(product([labels], [args.kersize], [args.kerstd], [eps],
-                       [maxiter], [ndims], [args.outfmt], [args.outdir],))
-
-    params = []
-    for i, row in enumerate(aux):
-        params.append(dict(
-            labels = row[0],
-            kersize = row[1],
-            kerstd = row[2],
-            eps = row[3],
-            maxiter = row[4],
-            ndims = row[5],
-            outfmt  = row[6],
-            outdir  = row[7]))
 
     outpath = pjoin(args.outdir, 'README.csv')
     del labels0
 
-    lastiters = [run_experiment(p) for p in params]
+    run_experiment(labels, args.kersize, args.kerstd,
+            eps, maxiter, args.outfmt, args.outdir)
     info('lastiters:{}'.format(lastiters))
 
     info('Elapsed time:{}'.format(time.time()-t0))
