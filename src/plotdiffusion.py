@@ -111,7 +111,6 @@ def plot_threshold(minpixarg, hdfdir, mask0, urbanmaskarg, figsize, outpath):
         info('diff step:{}'.format(std))
         mask = hdf2numpy(pjoin(hdfdir, '{:02d}.hdf5'.format(std)))
         inds = np.where(mask >= minpix)
-        
         steps[inds] = k # Keep the minimum time to achieve minpix
 
     # from matplotlib import cm
@@ -131,7 +130,8 @@ def plot_threshold(minpixarg, hdfdir, mask0, urbanmaskarg, figsize, outpath):
     # ax.set_title('Initial mean:{:.02f}, threshold:{:.02f}'. \
             # format(np.mean(mask0), minpix))
     cbar = fig.colorbar(im, ax=ax, fraction=0.04, pad=0.05)
-    cbar.set_label('Time (steps)', labelpad=5, rotation=-90)
+    cbar.set_label('Time (steps)', labelpad=15, rotation=-90)
+    plt.tight_layout()
     plt.savefig(outpath)
 
 ##########################################################
