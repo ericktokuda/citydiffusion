@@ -57,13 +57,17 @@ def parse_urban_mask(maskpath, maskshape):
     """Short description """
     info(inspect.stack()[0][3] + '()')
 
+    import cv2
+    from skimage.transform import resize
     if maskpath:
         mask = imageio.imread(maskpath)[:, :, 0]
         mask = (mask > 128)
+        breakpoint()
+        mask = resize(mask, maskshape)
+        
     else:
         mask = np.ones(maskshape, dtype=bool)
 
-    import cv2
 
     borderpts, aux = cv2.findContours(mask.astype(np.uint8),
             cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
