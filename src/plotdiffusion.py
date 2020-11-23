@@ -62,9 +62,7 @@ def parse_urban_mask(maskpath, maskshape):
     if maskpath:
         mask = imageio.imread(maskpath)[:, :, 0]
         mask = (mask > 128)
-        breakpoint()
         mask = resize(mask, maskshape)
-        
     else:
         mask = np.ones(maskshape, dtype=bool)
 
