@@ -63,7 +63,7 @@ def plot_signatures(outdir):
     nquart = int(n / 4)
     m = int(1.5 * nquart)
     nsteps = 30
-    l = 8
+    l = 4
     palette = plot.palettes['pastel']
 
     refpoints = (np.array([
@@ -78,20 +78,22 @@ def plot_signatures(outdir):
     prof = diffuse_with_source(im, ker2d, refpoints, nsteps, 'A', palette, outdir)
     fig, axs = plt.subplots(1, 1, figsize=(l, l))
     for j in range(prof.shape[1]):
-        axs.plot(range(nsteps), prof[:, j], c=palette[j], label=str(j))
+        axs.plot(range(nsteps), prof[:, j], c=palette[j], label='Point {}'.format(j))
         axs.set_xlabel('Time')
         axs.set_ylabel('Green index')
-    axs.legend(); plt.savefig(pjoin(outdir, 'A.png'))
+    plt.tight_layout()
+    axs.legend(); plt.savefig(pjoin(outdir, 'A.pdf'))
 
     im = np.ones((n, n), dtype=np.uint8); im[nquart:-nquart, m:-m] = 0
     prof = diffuse_with_source(im, ker2d, refpoints, nsteps, 'B', palette, outdir)
     fig, axs = plt.subplots(1, 1, figsize=(l, l))
     for j in range(prof.shape[1]):
-        axs.plot(range(nsteps), prof[:, j], label=str(j))
+        axs.plot(range(nsteps), prof[:, j], c=palette[j], label='Point {}'.format(j))
         axs.set_xlabel('Time')
         axs.set_ylabel('Green index')
-    axs.legend(); plt.savefig(pjoin(outdir, 'B.png'))
-      
+    plt.tight_layout()
+    axs.legend(); plt.savefig(pjoin(outdir, 'B.pdf'))
+
 ##########################################################
 def main():
     info(inspect.stack()[0][3] + '()')
