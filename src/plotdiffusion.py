@@ -17,7 +17,9 @@ import pandas as pd
 import h5py
 from scipy import ndimage
 from myutils import info, create_readme
-import imageio
+import PIL
+from PIL import Image
+PIL.Image.MAX_IMAGE_PIXELS = 360000000
 
 ##########################################################
 def hdf2numpy(hdfpath):
@@ -60,7 +62,7 @@ def parse_urban_mask(maskpath, maskshape):
     import cv2
     from skimage.transform import resize
     if maskpath:
-        mask = imageio.imread(maskpath)[:, :, 0]
+        mask = np.asarray(Image.open(maskpath))[:, :, 0]
         mask = (mask > 128)
         mask = resize(mask, maskshape)
     else:
@@ -69,7 +71,7 @@ def parse_urban_mask(maskpath, maskshape):
 
     borderpts, aux = cv2.findContours(mask.astype(np.uint8),
             cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    
+
     return np.array(borderpts), mask
 
 ##########################################################
@@ -95,8 +97,11 @@ def plot_threshold(minpixarg, hdfdir, mask0, urbanmaskarg, figsize, outpath):
     if minpixarg < 0:
         # By setting this value, I guarantee *all* pixels will achieve the
         # minimum desired values
+
         largeststdpath = pjoin(hdfdir, '{:02d}.hdf5'.format(sorted(stds)[-1]))
         minpix = np.min(hdf2numpy(largeststdpath))
+
+        # print(outpath, meanpix); return # For finding the min over all cities
     else:
         minpix = minpixarg
 
