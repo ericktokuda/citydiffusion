@@ -12,6 +12,7 @@ import numpy as np
 from itertools import product
 import matplotlib; matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from datetime import datetime
 import pandas as pd
 import h5py
@@ -33,10 +34,15 @@ def plot_disttransform(figsize, mask0, outpath):
     """Short description """
     info(inspect.stack()[0][3] + '()')
 
-    plt.figure(figsize=figsize)
+    fig, ax = plt.subplots(figsize=figsize, dpi=100)
     distransf = ndimage.distance_transform_edt(mask0.astype(int))
-    plt.imshow(distransf)
-    plt.colorbar()
+    im = ax.imshow(distransf)
+    ax.set_axis_off()
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.1)
+    cbar = plt.colorbar(im, cax=cax)
+    cbar.set_label('Distance', labelpad=15, rotation=-90)
+    plt.tight_layout()
     plt.savefig(outpath)
 
 ##########################################################
@@ -136,7 +142,12 @@ def plot_threshold(minpixarg, hdfdir, mask0, urbanmaskarg, figsize, outpath):
     ax.set_axis_off()
     # ax.set_title('Initial mean:{:.02f}, threshold:{:.02f}'. \
             # format(np.mean(mask0), minpix))
-    cbar = fig.colorbar(im, ax=ax, fraction=0.04, pad=0.05)
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.1)
+    cbar = plt.colorbar(im, cax=cax)
+
+    # plt.colorbar(im,fraction=0.046, pad=0.04)
     cbar.set_label('Time (steps)', labelpad=15, rotation=-90)
     plt.tight_layout()
     plt.savefig(outpath)
@@ -160,7 +171,7 @@ def main():
     mask0 = hdf2numpy(pjoin(args.hdfdir, '00.hdf5'))
 
     distpath = pjoin(args.outdir, 'distransform.pdf')
-    # plot_disttransform(figsize, mask0, distpath)
+    plot_disttransform(figsize, mask0, distpath)
 
     threshpath = pjoin(args.outdir, 'diffusion_{:03d}.pdf'. \
             format(int(args.minpix*100)))
