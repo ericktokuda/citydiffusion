@@ -131,6 +131,7 @@ def plot_threshold(minpixarg, hdfdir, mask0, urbanmaskarg, figsize, outpath):
     # mycmap = cm.get_cmap('jet', 12)
 
     fig, ax = plt.subplots(figsize=figsize, dpi=100)
+    steps[~urbanmask.astype(bool)] = 0 # Crop urban area
     im = ax.imshow(steps,
             # cmap=mycmap,
             # norm=matplotlib.colors.LogNorm(vmin=steps.min(), vmax=steps.max()),
