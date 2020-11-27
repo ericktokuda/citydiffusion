@@ -78,7 +78,7 @@ def parse_urban_mask(maskpath, maskshape):
     borderpts, aux = cv2.findContours(mask.astype(np.uint8),
             cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-    return np.array(borderpts), mask
+    return borderpts, mask
 
 ##########################################################
 def plot_contour(maskpath):
@@ -98,6 +98,7 @@ def plot_threshold(minpixarg, hdfdir, mask0, urbanmaskarg, figsize, outpath):
     """Plot the required time of the pixels of a map to achieve a minimum value"""
     info(inspect.stack()[0][3] + '()')
 
+    stepsat = 25 # satutation step
     hdfpaths, stds = list_hdffiles_and_stds(hdfdir)
 
     if minpixarg < 0:
@@ -115,12 +116,13 @@ def plot_threshold(minpixarg, hdfdir, mask0, urbanmaskarg, figsize, outpath):
 
     urbanborder, urbanmask = parse_urban_mask(urbanmaskarg, mask0.shape)
 
-    steps = -10*np.ones(mask0.shape, dtype=float) # Num steps to achieve minpix
+    steps = - np.ones(mask0.shape, dtype=int) # Num steps to achieve minpix
 
     info('Traversing backwards...')
     nstds = len(stds)
+
     for i, std in enumerate(sorted(stds, reverse=True)): # Traverse backwards
-        k = nstds - i
+        k = nstds - i - 1
         info('diff step:{}'.format(std))
         mask = hdf2numpy(pjoin(hdfdir, '{:02d}.hdf5'.format(std)))
         inds = np.where(mask >= minpix)
@@ -130,15 +132,13 @@ def plot_threshold(minpixarg, hdfdir, mask0, urbanmaskarg, figsize, outpath):
     # from matplotlib.colors import ListedColormap, LinearSegmentedColormap
     # mycmap = cm.get_cmap('jet', 12)
 
+    steps[steps > 20] = 20
     fig, ax = plt.subplots(figsize=figsize, dpi=100)
     steps[~urbanmask.astype(bool)] = 0 # Crop urban area
-    im = ax.imshow(steps,
+    im = ax.imshow(steps, vmin=0, vmax=stepsat,
             # cmap=mycmap,
             # norm=matplotlib.colors.LogNorm(vmin=steps.min(), vmax=steps.max()),
             )
-
-    for aux in urbanborder:
-        ax.plot(aux[:, 0, 0], aux[:, 0, 1], c='gray')
 
     ax.set_axis_off()
     # ax.set_title('Initial mean:{:.02f}, threshold:{:.02f}'. \
@@ -146,12 +146,30 @@ def plot_threshold(minpixarg, hdfdir, mask0, urbanmaskarg, figsize, outpath):
     from mpl_toolkits.axes_grid1 import make_axes_locatable
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.1)
-    cbar = plt.colorbar(im, cax=cax)
 
-    # plt.colorbar(im,fraction=0.046, pad=0.04)
+    cmap = plt.cm.viridis  # define the colormap
+    cmaplist = [cmap(i) for i in range(cmap.N)]
+
+    cmap = matplotlib.colors.LinearSegmentedColormap.from_list(
+    'Custom cmap', cmaplist, cmap.N)
+
+    bounds = np.arange(0, stepsat + .1, 1)
+    # norm = matplotlib.colors.BoundaryNorm(bounds, cmap.N)
+
+    cbar = plt.colorbar(im, cax=cax,
+                            spacing='proportional', ticks=bounds, boundaries=bounds, format='%1i')
+    # cbar = plt.colorbar(im, cax=cax)
+
+    for aux in urbanborder: ax.plot(aux[:, 0, 0], aux[:, 0, 1], c='gray')
+
     cbar.set_label('Time (steps)', labelpad=15, rotation=-90)
     plt.tight_layout()
     plt.savefig(outpath)
+
+    distr = np.zeros(stepsat + 1, dtype=int)
+    # Store the steps
+    vals, counts = np.unique(steps[urbanmask.astype(bool)], return_counts=True)
+    for v, c in zip(vals, counts): distr[int(v)] = c
 
 ##########################################################
 def main():
