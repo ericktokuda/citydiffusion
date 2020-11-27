@@ -101,7 +101,7 @@ def plot_threshold(minpixarg, hdfdir, mask0, urbanmaskarg, figsize, outdir):
     outpath = pjoin(outdir, 'diffusion_{:03d}.pdf'. \
             format(int(minpixarg*100)))
 
-    stepsat = 25 # satutation step
+    stepsat = 18 # satutation step .6:18, .75:25
     hdfpaths, stds = list_hdffiles_and_stds(hdfdir)
 
     if minpixarg < 0:
