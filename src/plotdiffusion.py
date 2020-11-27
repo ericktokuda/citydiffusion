@@ -170,6 +170,7 @@ def plot_threshold(minpixarg, hdfdir, mask0, urbanmaskarg, figsize, outdir):
     cbar.set_label('Time (steps)', labelpad=15, rotation=-90)
     plt.tight_layout()
     plt.savefig(outpath)
+    plt.close()
 
     distr = np.zeros(stepsat + 1, dtype=int)
 
@@ -178,6 +179,12 @@ def plot_threshold(minpixarg, hdfdir, mask0, urbanmaskarg, figsize, outdir):
     info(vals, counts)
     for v, c in zip(vals, counts): distr[int(v)] = c
     np.savetxt(pjoin(outdir, 'hist.csv'), distr, fmt='%d', delimiter=',')
+
+    fig, ax = plt.subplots(figsize=figsize, dpi=100)
+    ax.hist(range(stepsat + 1), weights=distr/np.sum(distr))
+    ax.set_xlabel('Time (steps)')
+    ax.set_ylim(0, .5)
+    plt.savefig(pjoin(outdir, 'hist.pdf'))
 
 ##########################################################
 def main():
