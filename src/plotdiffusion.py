@@ -94,9 +94,12 @@ def plot_contour(maskpath):
             cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
 
 ##########################################################
-def plot_threshold(minpixarg, hdfdir, mask0, urbanmaskarg, figsize, outpath):
+def plot_threshold(minpixarg, hdfdir, mask0, urbanmaskarg, figsize, outdir):
     """Plot the required time of the pixels of a map to achieve a minimum value"""
     info(inspect.stack()[0][3] + '()')
+
+    outpath = pjoin(outdir, 'diffusion_{:03d}.pdf'. \
+            format(int(minpixarg*100)))
 
     stepsat = 25 # satutation step
     hdfpaths, stds = list_hdffiles_and_stds(hdfdir)
@@ -132,7 +135,9 @@ def plot_threshold(minpixarg, hdfdir, mask0, urbanmaskarg, figsize, outpath):
     # from matplotlib.colors import ListedColormap, LinearSegmentedColormap
     # mycmap = cm.get_cmap('jet', 12)
 
-    steps[steps > 20] = 20
+    info('Saturating pixels by {}'.format(stepsat))
+    steps[steps > stepsat] = stepsat
+
     fig, ax = plt.subplots(figsize=figsize, dpi=100)
     steps[~urbanmask.astype(bool)] = 0 # Crop urban area
     im = ax.imshow(steps, vmin=0, vmax=stepsat,
@@ -167,9 +172,12 @@ def plot_threshold(minpixarg, hdfdir, mask0, urbanmaskarg, figsize, outpath):
     plt.savefig(outpath)
 
     distr = np.zeros(stepsat + 1, dtype=int)
+
     # Store the steps
     vals, counts = np.unique(steps[urbanmask.astype(bool)], return_counts=True)
+    info(vals, counts)
     for v, c in zip(vals, counts): distr[int(v)] = c
+    np.savetxt(pjoin(outdir, 'hist.csv'), distr, fmt='%d', delimiter=',')
 
 ##########################################################
 def main():
@@ -192,10 +200,8 @@ def main():
     distpath = pjoin(args.outdir, 'distransform.pdf')
     plot_disttransform(figsize, mask0, distpath)
 
-    threshpath = pjoin(args.outdir, 'diffusion_{:03d}.pdf'. \
-            format(int(args.minpix*100)))
     plot_threshold(args.minpix, args.hdfdir, mask0, args.urbanmask,
-            figsize, threshpath)
+            figsize, args.outdir)
 
     info('Elapsed time:{}'.format(time.time()-t0))
 
