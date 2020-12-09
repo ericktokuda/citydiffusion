@@ -10,7 +10,7 @@ import inspect
 
 import numpy as np
 from itertools import product
-import matplotlib; matplotlib.use('Agg')
+import matplotlib as mpl; mpl.use('Agg')
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from datetime import datetime
@@ -22,6 +22,7 @@ import PIL
 from PIL import Image
 PIL.Image.MAX_IMAGE_PIXELS = 360000000
 
+RURAL = -2
 ##########################################################
 def hdf2numpy(hdfpath):
     """Convert hdf5 file to numpy """
@@ -30,10 +31,11 @@ def hdf2numpy(hdfpath):
     return data
 
 ##########################################################
-def plot_disttransform(figsize, mask0path, outpath):
+def plot_disttransform(figsize, mask0path, outdir):
     """Short description """
     info(inspect.stack()[0][3] + '()')
 
+    outpath = pjoin(outdir, 'distransform.pdf')
     mask0 = hdf2numpy(mask0path)
     fig, ax = plt.subplots(figsize=figsize, dpi=100)
     distransf = ndimage.distance_transform_edt(mask0.astype(int))
@@ -79,7 +81,7 @@ def parse_urban_mask(maskpath, maskshape):
     borderpts, aux = cv2.findContours(mask.astype(np.uint8),
             cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-    return borderpts, mask
+    return borderpts, mask.astype(bool)
 
 ##########################################################
 def plot_contour(maskpath):
@@ -95,88 +97,106 @@ def plot_contour(maskpath):
             cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
 
 ##########################################################
-def get_minpix_in_last_step(hdfdir):
-    """Get the minimum pixel value in last iteration. It is useful the get
-    a common args.minpix across the cities"""
+def get_min_time(minpixarg, hdfpaths):
+    """Short description """
     info(inspect.stack()[0][3] + '()')
-
-    return np.min(hdf2numpy(hdfpaths[-1]))
-
-##########################################################
-def plot_threshold(minpixarg, hdfpaths, stds, urbanmaskarg, figsize, outdir):
-    """Plot the required time of the pixels of a map to achieve a minimum value"""
-    info(inspect.stack()[0][3] + '()')
-
-    outpath = pjoin(outdir, 'diffusion_{:03d}.pdf'. \
-            format(int(minpixarg*100)))
-
-    stepsat = 18 # satutation step .6:18, .75:25
-    # hdfpaths, stds = list_hdffiles_and_stds(hdfdir)
-
     masklast = hdf2numpy(hdfpaths[-1])
-    # If minpixarg is equal to -1, we only consider the reachable values
     minpix = np.min(masklast) if minpixarg < 0 else minpixarg
-
-    urbanborder, urbanmask = parse_urban_mask(urbanmaskarg, masklast.shape)
 
     steps = - np.ones(masklast.shape, dtype=int) # Num steps to achieve minpix
 
-    info('Traversing backwards...')
-    nstds = len(stds)
+    nstds = len(hdfpaths)
 
-    for i, std in enumerate(sorted(stds, reverse=True)): # Traverse backwards
-        k = nstds - i - 1
-        info('diff step:{}'.format(std))
-        mask = hdf2numpy(hdfpaths[k])
-        steps[np.where(mask >= minpix)] = k # Keep the minimum time to achieve minpix
+    for i in range(nstds - 1, -1, -1): # Traverse backwards
+        mask = hdf2numpy(hdfpaths[i])
+        steps[np.where(mask >= minpix)] = i # Keep the minimum time to achieve minpix
 
-    info('Saturating pixels by {}'.format(stepsat))
-    steps[steps > stepsat] = stepsat
+    return steps
+
+##########################################################
+def fill_non_urban_area(steps, urbanmaskarg, fillvalue=0):
+    """The area not covered by @urbanmaskarg is filled with @fillvalue"""
+    info(inspect.stack()[0][3] + '()')
+    
+    urbanborder, urbanmask = parse_urban_mask(urbanmaskarg, steps.shape)
+    
+    if np.all(urbanmask): info('No urban area provided!')
+    steps[~urbanmask] = fillvalue
+    return steps
+
+##########################################################
+def plot_threshold(stepsorig, minpixarg, stepsat, urbanmaskarg, figsize, outdir):
+    """Plot values in @steps
+    If @stepsat == -1, it finds the reachable values and ignore @stepsat.
+    """
+    info(inspect.stack()[0][3] + '()')
+
+    outpath = pjoin(outdir, 'heatmap_{:.02f}.pdf'.format(minpixarg))
 
     fig, ax = plt.subplots(figsize=figsize, dpi=100)
-    steps[~urbanmask.astype(bool)] = 0 # Crop urban area
-    im = ax.imshow(steps, vmin=0, vmax=stepsat,
-            # cmap=mycmap,
-            # norm=matplotlib.colors.LogNorm(vmin=steps.min(), vmax=steps.max()),
-            )
+    
+    steps = stepsorig.copy()
+    steps[np.where(steps == RURAL)] = 0
 
-    ax.set_axis_off()
-    from mpl_toolkits.axes_grid1 import make_axes_locatable
+    if stepsat > 0:
+        info('Saturating pixels by {}'.format(stepsat))
+        im = ax.imshow(steps, vmin=0, vmax=stepsat)
+        bounds = np.arange(0, stepsat + 1, 1)
+    else:
+        im = ax.imshow(steps)
+        bounds = np.arange(0, np.max(steps) + 1, 1)
+                # cmap=mycmap,
+                # norm=matplotlib.colors.LogNorm(vmin=steps.min(), vmax=steps.max()),
+
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.1)
-
     cmap = plt.cm.viridis  # define the colormap
     cmaplist = [cmap(i) for i in range(cmap.N)]
-
-    cmap = matplotlib.colors.LinearSegmentedColormap.from_list(
-    'Custom cmap', cmaplist, cmap.N)
-
-    bounds = np.arange(0, stepsat + .1, 1)
+    cmap = mpl.colors.LinearSegmentedColormap.from_list('x', cmaplist, cmap.N)
+    
     # norm = matplotlib.colors.BoundaryNorm(bounds, cmap.N)
+    cbar = plt.colorbar(im, cax=cax, spacing='proportional',
+            ticks=bounds, boundaries=bounds, format='%1i')
 
-    cbar = plt.colorbar(im, cax=cax,
-                            spacing='proportional', ticks=bounds, boundaries=bounds, format='%1i')
-    # cbar = plt.colorbar(im, cax=cax)
-
+    urbanborder, _ = parse_urban_mask(urbanmaskarg, steps.shape)
     for aux in urbanborder: ax.plot(aux[:, 0, 0], aux[:, 0, 1], c='gray')
 
     cbar.set_label('Time (steps)', labelpad=15, rotation=-90)
+    ax.set_axis_off()
     plt.tight_layout()
     plt.savefig(outpath)
     plt.close()
 
-    distr = np.zeros(stepsat + 1, dtype=int)
+##########################################################
+def plot_histogram(steps, minpixarg, outdir):
+    """Short description """
+    info(inspect.stack()[0][3] + '()')
 
     # Store the steps
-    vals, counts = np.unique(steps[urbanmask.astype(bool)], return_counts=True)
-    for v, c in zip(vals, counts): distr[int(v)] = c
-    np.savetxt(pjoin(outdir, 'hist.csv'), distr, fmt='%d', delimiter=',')
+    vals, counts = np.unique(steps, return_counts=True)
+    
+    distr = np.zeros(np.max(vals) + 1, dtype=int)
+    for v, c in zip(vals, counts):
+        if v < 0: continue # non urban areas
+        distr[int(v)] = c
 
-    fig, ax = plt.subplots(figsize=figsize, dpi=100)
-    ax.hist(range(stepsat + 1), weights=distr/np.sum(distr))
-    ax.set_xlabel('Time (steps)')
-    ax.set_ylim(0, .5)
-    plt.savefig(pjoin(outdir, 'hist.pdf'))
+    countpath = pjoin(outdir, 'count_{:.02f}.txt'.format(minpixarg))
+    np.savetxt(countpath, distr, fmt='%d')
+
+##########################################################
+def print_mean_and_min(hdfpaths):
+    """Get the mean of @mask0path and the min pixel value of @masklastpath """
+    mean0 = np.mean(hdf2numpy(hdfpaths[0])) # Get the minpix of last iter
+    minlast = np.min(hdf2numpy(hdfpaths[-1])) # Get the minpix of last iter
+    info('mean0:{:.02f}, minpix:{:.02f}'.format(mean0, minlast))
+
+##########################################################
+def store_steps(steps, minpix, outdir):
+    """Store @steps as hdf5"""
+    info(inspect.stack()[0][3] + '()')
+    outpath = pjoin(outdir, 'steps_{:.02f}.hdf5'.format(minpix))
+    with h5py.File(outpath, "w") as f:
+        dset = f.create_dataset("data", data=steps, dtype='f')
 
 ##########################################################
 def main():
@@ -194,13 +214,17 @@ def main():
 
     W = 600; H = 800; figsize=(W*.01, H*.01)
 
+    if args.minpix == -1: stepsat = -1
+    else: stepsat = 18 # Adjust here, if args.urbanmask is set
+
     hdfpaths, stds = list_hdffiles_and_stds(args.hdfdir)
-    distpath = pjoin(args.outdir, 'distransform.pdf')
-    # plot_disttransform(figsize, hdfpaths[0], distpath)
-    minpix = np.min(hdf2numpy(hdfpaths[-1])) # Get the minpix of last iter
-    
-    plot_threshold(args.minpix, hdfpaths, stds, args.urbanmask,
-            figsize, args.outdir)
+    print_mean_and_min(hdfpaths)
+    plot_disttransform(figsize, hdfpaths[0], args.outdir)
+    steps = get_min_time(args.minpix, hdfpaths)
+    steps = fill_non_urban_area(steps, args.urbanmask, RURAL)
+    store_steps(steps, args.minpix, args.outdir)
+    plot_threshold(steps, args.minpix, stepsat, args.urbanmask, figsize, args.outdir)
+    plot_histogram(steps, args.minpix, args.outdir)
 
     info('Elapsed time:{}'.format(time.time()-t0))
 
