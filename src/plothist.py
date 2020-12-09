@@ -59,22 +59,13 @@ def plot_fits(y, outpath):
     plt.close()
 
 ##########################################################
-def plot_histograms(citiesdir, outdir):
+def plot_histograms(countsall, outdir):
     """Plot the histogram of all cities in @citiesdir and write to @outdir"""
     info(inspect.stack()[0][3] + '()')
+
     maxlen = 0
-    countsall = {}
-    green0 = {}
-    for d in os.listdir(citiesdir):
-        if len(d) > 2: continue
-        citydir = pjoin(citiesdir, d)
-        if not os.path.isdir(citydir): continue
-        histpath = os.path.join(citydir, 'count_-1.00.txt')
-        count = np.loadtxt(histpath)
+    for count in countsall.values():
         if len(count) > maxlen: maxlen = len(count)
-        countsall[d] = count[1:] / np.sum(count[1:])
-        green0[d] = count[0] / np.sum(count)
-        plot_fits(countsall[d], pjoin(outdir, '{}.png'.format(d)))
 
     fig, ax = plt.subplots()
     x = range(1, maxlen + 1) # We treat separately step=0 (started green)
@@ -89,6 +80,32 @@ def plot_histograms(citiesdir, outdir):
     plt.close()
 
 ##########################################################
+def plot_fits_all(countsall, outdir):
+    """Plot the histogram of all cities in @citiesdir and write to @outdir"""
+    info(inspect.stack()[0][3] + '()')
+
+    for city, vals in countsall.items():
+        plot_fits(vals, pjoin(outdir, 'fits_{}.png').format(city))
+
+##########################################################
+def get_distribs(citiesdir, outdir):
+    """Plot the histogram of all cities in @citiesdir and write to @outdir"""
+    info(inspect.stack()[0][3] + '()')
+
+    countsall = {}
+    green0 = {}
+    for d in os.listdir(citiesdir):
+        if len(d) > 2: continue
+        citydir = pjoin(citiesdir, d)
+        if not os.path.isdir(citydir): continue
+        histpath = os.path.join(citydir, 'count_-1.00.txt')
+        count = np.loadtxt(histpath)
+        countsall[d] = count[1:] / np.sum(count[1:])
+        green0[d] = count[0] / np.sum(count)
+
+    return countsall, green0
+
+##########################################################
 def main():
     info(inspect.stack()[0][3] + '()')
     t0 = time.time()
@@ -100,7 +117,9 @@ def main():
     os.makedirs(args.outdir, exist_ok=True)
     readmepath = create_readme(sys.argv, args.outdir)
 
-    plot_histograms(args.citiesdir, args.outdir)
+    countsall, green0 = get_distribs(args.citiesdir, args.outdir)
+    plot_histograms(countsall, args.outdir)
+    plot_fits_all(countsall, args.outdir)
 
     info('Elapsed time:{}'.format(time.time()-t0))
     info('Output generated in {}'.format(args.outdir))
