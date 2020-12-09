@@ -178,7 +178,7 @@ def plot_contour(stepsorig, minpixarg, stepsat, urbanmaskarg, figsize, outdir):
     plt.close()
 
 ##########################################################
-def plot_histogram(steps, minpixarg, outdir):
+def store_steps_distrib(steps, minpixarg, outdir):
     """Short description """
     info(inspect.stack()[0][3] + '()')
 
@@ -232,7 +232,7 @@ def main():
 
     plot_threshold(steps, args.minpix, stepsat, args.urbanmask, figsize, args.outdir)
     plot_contour(steps, args.minpix, stepsat, args.urbanmask, figsize, args.outdir)
-    plot_histogram(steps, args.minpix, args.outdir)
+    store_steps_distrib(steps, args.minpix, args.outdir)
 
     info('Elapsed time:{}'.format(time.time()-t0))
 
