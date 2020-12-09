@@ -98,9 +98,23 @@ def conv_gpu(ker, map_):
     imgout = F.conv2d(img, filt, bias=None, padding=ker.shape[0]//2, stride=(1, 1))
     return imgout.cpu().numpy()[0][0]
 
+##########################################################
+def store_data(zold, i, kerrad, outdir):
+    """Store intermediate or just the final data"""
+    outpath = pjoin(outdir, '{:02d}.png'.format(i))
+    r = kerrad
+    fig = plt.figure(figsize=(20, 20))
+    plt.imshow(zold[r:-r,r:-r], cmap='gray');
+    plt.savefig(outpath)
+    plt.close()
+
+    outpath = pjoin(outdir, '{:02d}.hdf5'.format(i))
+    with h5py.File(outpath, "w") as f:
+        dset = f.create_dataset("data", data=zold[r:-r,r:-r], dtype='f')
+
 #############################################################
 def run_experiment(labels, diam, std, eps, maxiter, outfmt, outdir):
-    r = int(diam/2)
+    kerrad = int(diam/2)
 
     h, w = labels.shape
 
@@ -117,15 +131,7 @@ def run_experiment(labels, diam, std, eps, maxiter, outfmt, outdir):
     zold = labels.copy()
     for i in range(maxiter+1):
         info('i:{}'.format(i))
-        if outfmt in ['png', 'both']:
-            outpath = pjoin(outdir, '{:02d}.png'.format(i))
-            fig = plt.figure(figsize=(20, 20))
-            plt.imshow(zold[r:-r,r:-r], cmap='gray'); plt.savefig(outpath)
-            plt.close()
-        if outfmt in ['hdf5', 'both']:
-            outpath = pjoin(outdir, '{:02d}.hdf5'.format(i))
-            with h5py.File(outpath, "w") as f:
-                dset = f.create_dataset("data", data=zold[r:-r,r:-r], dtype='f')
+        store_data(zold, i, kerrad, outdir)
 
         if CUDA: z =  conv_gpu(ker2d, zold)
         else: z = convolve2d(zold, ker2d, mode='same')
