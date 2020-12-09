@@ -84,19 +84,6 @@ def parse_urban_mask(maskpath, maskshape):
     return borderpts, mask.astype(bool)
 
 ##########################################################
-def plot_contour(maskpath):
-    """Plot the contour"""
-    info(inspect.stack()[0][3] + '()')
-
-    import cv2
-    im = cv2.imread(maskpath)
-
-    imgray = cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
-    ret,thresh = cv2.threshold(imgray,127,255,0)
-    image, contours, hierarchy = cv2.findContours(thresh,
-            cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
-
-##########################################################
 def get_min_time(minpixarg, hdfpaths):
     """Short description """
     info(inspect.stack()[0][3] + '()')
@@ -117,9 +104,9 @@ def get_min_time(minpixarg, hdfpaths):
 def fill_non_urban_area(steps, urbanmaskarg, fillvalue=0):
     """The area not covered by @urbanmaskarg is filled with @fillvalue"""
     info(inspect.stack()[0][3] + '()')
-    
+
     urbanborder, urbanmask = parse_urban_mask(urbanmaskarg, steps.shape)
-    
+
     if np.all(urbanmask): info('No urban area provided!')
     steps[~urbanmask] = fillvalue
     return steps
@@ -132,9 +119,10 @@ def plot_threshold(stepsorig, minpixarg, stepsat, urbanmaskarg, figsize, outdir)
     info(inspect.stack()[0][3] + '()')
 
     outpath = pjoin(outdir, 'heatmap_{:.02f}.pdf'.format(minpixarg))
+    if os.path.exists(outpath): return
 
     fig, ax = plt.subplots(figsize=figsize, dpi=100)
-    
+
     steps = stepsorig.copy()
     steps[np.where(steps == RURAL)] = 0
 
@@ -153,7 +141,7 @@ def plot_threshold(stepsorig, minpixarg, stepsat, urbanmaskarg, figsize, outdir)
     cmap = plt.cm.viridis  # define the colormap
     cmaplist = [cmap(i) for i in range(cmap.N)]
     cmap = mpl.colors.LinearSegmentedColormap.from_list('x', cmaplist, cmap.N)
-    
+
     # norm = matplotlib.colors.BoundaryNorm(bounds, cmap.N)
     cbar = plt.colorbar(im, cax=cax, spacing='proportional',
             ticks=bounds, boundaries=bounds, format='%1i')
@@ -168,19 +156,40 @@ def plot_threshold(stepsorig, minpixarg, stepsat, urbanmaskarg, figsize, outdir)
     plt.close()
 
 ##########################################################
+def plot_contour(stepsorig, minpixarg, stepsat, urbanmaskarg, figsize, outdir):
+    """Plot values in @steps
+    If @stepsat == -1, it finds the reachable values and ignore @stepsat.
+    """
+    info(inspect.stack()[0][3] + '()')
+
+    outpath = pjoin(outdir, 'contour_{:.02f}.pdf'.format(minpixarg))
+
+    steps = stepsorig.copy()
+    # steps[np.where(steps == RURAL)] = 0
+
+    fig, ax = plt.subplots(figsize=figsize, dpi=100)
+    im = ax.contour(steps)
+    # cbar = fig.colorbar(im)
+    # cbar.set_label('Time (steps)', labelpad=15, rotation=-90)
+    plt.gca().invert_yaxis()
+    ax.set_axis_off()
+    plt.tight_layout()
+    plt.savefig(outpath)
+    plt.close()
+
+##########################################################
 def plot_histogram(steps, minpixarg, outdir):
     """Short description """
     info(inspect.stack()[0][3] + '()')
 
-    # Store the steps
+    countpath = pjoin(outdir, 'count_{:.02f}.txt'.format(minpixarg))
+    if os.path.exists(countpath): return
     vals, counts = np.unique(steps, return_counts=True)
-    
     distr = np.zeros(np.max(vals) + 1, dtype=int)
     for v, c in zip(vals, counts):
         if v < 0: continue # non urban areas
         distr[int(v)] = c
 
-    countpath = pjoin(outdir, 'count_{:.02f}.txt'.format(minpixarg))
     np.savetxt(countpath, distr, fmt='%d')
 
 ##########################################################
@@ -189,14 +198,6 @@ def print_mean_and_min(hdfpaths):
     mean0 = np.mean(hdf2numpy(hdfpaths[0])) # Get the minpix of last iter
     minlast = np.min(hdf2numpy(hdfpaths[-1])) # Get the minpix of last iter
     info('mean0:{:.02f}, minpix:{:.02f}'.format(mean0, minlast))
-
-##########################################################
-def store_steps(steps, minpix, outdir):
-    """Store @steps as hdf5"""
-    info(inspect.stack()[0][3] + '()')
-    outpath = pjoin(outdir, 'steps_{:.02f}.hdf5'.format(minpix))
-    with h5py.File(outpath, "w") as f:
-        dset = f.create_dataset("data", data=steps, dtype='f')
 
 ##########################################################
 def main():
@@ -212,18 +213,25 @@ def main():
     os.makedirs(args.outdir, exist_ok=True)
     readmepath = create_readme(sys.argv, args.outdir)
 
-    W = 600; H = 800; figsize=(W*.01, H*.01)
-
     if args.minpix == -1: stepsat = -1
     else: stepsat = 18 # Adjust here, if args.urbanmask is set
 
-    hdfpaths, stds = list_hdffiles_and_stds(args.hdfdir)
-    print_mean_and_min(hdfpaths)
-    plot_disttransform(figsize, hdfpaths[0], args.outdir)
-    steps = get_min_time(args.minpix, hdfpaths)
-    steps = fill_non_urban_area(steps, args.urbanmask, RURAL)
-    store_steps(steps, args.minpix, args.outdir)
+    stepspath = pjoin(args.outdir, 'steps_{:.02f}.hdf5'.format(args.minpix))
+    if os.path.exists(stepspath):
+        steps = hdf2numpy(stepspath).astype(int)
+    else:
+        hdfpaths, stds = list_hdffiles_and_stds(args.hdfdir)
+        print_mean_and_min(hdfpaths)
+        plot_disttransform(figsize, hdfpaths[0], args.outdir)
+        steps = get_min_time(args.minpix, hdfpaths)
+        steps = fill_non_urban_area(steps, args.urbanmask, RURAL)
+        with h5py.File(stepspath, "w") as f:
+            f.create_dataset("data", data=steps, dtype='f')
+
+    figsize = (8, int(8 * (steps.shape[0] / steps.shape[1])))
+
     plot_threshold(steps, args.minpix, stepsat, args.urbanmask, figsize, args.outdir)
+    plot_contour(steps, args.minpix, stepsat, args.urbanmask, figsize, args.outdir)
     plot_histogram(steps, args.minpix, args.outdir)
 
     info('Elapsed time:{}'.format(time.time()-t0))
