@@ -94,6 +94,29 @@ def plot_contour(maskpath):
             cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
 
 ##########################################################
+def get_minpix_in_last_step(hdfdir, mask0):
+    """Plot the required time of the pixels of a map to achieve a minimum value"""
+    info(inspect.stack()[0][3] + '()')
+
+    outpath = pjoin(outdir, 'diffusion_{:03d}.pdf'. \
+            format(int(minpixarg*100)))
+
+    stepsat = 18 # satutation step .6:18, .75:25
+    hdfpaths, stds = list_hdffiles_and_stds(hdfdir)
+
+    if minpixarg < 0:
+        # By setting this value, I guarantee *all* pixels will achieve the
+        # minimum desired values
+
+        largeststdpath = pjoin(hdfdir, '{:02d}.hdf5'.format(sorted(stds)[-1]))
+        minpix = np.min(hdf2numpy(largeststdpath))
+
+        # print(outpath, meanpix); return # For finding the min over all cities
+    else:
+        minpix = minpixarg
+
+
+##########################################################
 def plot_threshold(minpixarg, hdfdir, mask0, urbanmaskarg, figsize, outdir):
     """Plot the required time of the pixels of a map to achieve a minimum value"""
     info(inspect.stack()[0][3] + '()')
