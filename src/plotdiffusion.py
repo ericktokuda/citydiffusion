@@ -30,10 +30,11 @@ def hdf2numpy(hdfpath):
     return data
 
 ##########################################################
-def plot_disttransform(figsize, mask0, outpath):
+def plot_disttransform(figsize, mask0path, outpath):
     """Short description """
     info(inspect.stack()[0][3] + '()')
 
+    mask0 = hdf2numpy(mask0path)
     fig, ax = plt.subplots(figsize=figsize, dpi=100)
     distransf = ndimage.distance_transform_edt(mask0.astype(int))
     im = ax.imshow(distransf)
@@ -94,30 +95,15 @@ def plot_contour(maskpath):
             cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
 
 ##########################################################
-def get_minpix_in_last_step(hdfdir, mask0):
-    """Plot the required time of the pixels of a map to achieve a minimum value"""
+def get_minpix_in_last_step(hdfdir):
+    """Get the minimum pixel value in last iteration. It is useful the get
+    a common args.minpix across the cities"""
     info(inspect.stack()[0][3] + '()')
 
-    outpath = pjoin(outdir, 'diffusion_{:03d}.pdf'. \
-            format(int(minpixarg*100)))
-
-    stepsat = 18 # satutation step .6:18, .75:25
-    hdfpaths, stds = list_hdffiles_and_stds(hdfdir)
-
-    if minpixarg < 0:
-        # By setting this value, I guarantee *all* pixels will achieve the
-        # minimum desired values
-
-        largeststdpath = pjoin(hdfdir, '{:02d}.hdf5'.format(sorted(stds)[-1]))
-        minpix = np.min(hdf2numpy(largeststdpath))
-
-        # print(outpath, meanpix); return # For finding the min over all cities
-    else:
-        minpix = minpixarg
-
+    return np.min(hdf2numpy(hdfpaths[-1]))
 
 ##########################################################
-def plot_threshold(minpixarg, hdfdir, mask0, urbanmaskarg, figsize, outdir):
+def plot_threshold(minpixarg, hdfpaths, stds, urbanmaskarg, figsize, outdir):
     """Plot the required time of the pixels of a map to achieve a minimum value"""
     info(inspect.stack()[0][3] + '()')
 
@@ -125,24 +111,15 @@ def plot_threshold(minpixarg, hdfdir, mask0, urbanmaskarg, figsize, outdir):
             format(int(minpixarg*100)))
 
     stepsat = 18 # satutation step .6:18, .75:25
-    hdfpaths, stds = list_hdffiles_and_stds(hdfdir)
+    # hdfpaths, stds = list_hdffiles_and_stds(hdfdir)
 
-    if minpixarg < 0:
-        # By setting this value, I guarantee *all* pixels will achieve the
-        # minimum desired values
+    masklast = hdf2numpy(hdfpaths[-1])
+    # If minpixarg is equal to -1, we only consider the reachable values
+    minpix = np.min(masklast) if minpixarg < 0 else minpixarg
 
-        largeststdpath = pjoin(hdfdir, '{:02d}.hdf5'.format(sorted(stds)[-1]))
-        minpix = np.min(hdf2numpy(largeststdpath))
+    urbanborder, urbanmask = parse_urban_mask(urbanmaskarg, masklast.shape)
 
-        # print(outpath, meanpix); return # For finding the min over all cities
-    else:
-        minpix = minpixarg
-
-    info('minpix:{}'.format(minpix))
-
-    urbanborder, urbanmask = parse_urban_mask(urbanmaskarg, mask0.shape)
-
-    steps = - np.ones(mask0.shape, dtype=int) # Num steps to achieve minpix
+    steps = - np.ones(masklast.shape, dtype=int) # Num steps to achieve minpix
 
     info('Traversing backwards...')
     nstds = len(stds)
@@ -150,13 +127,8 @@ def plot_threshold(minpixarg, hdfdir, mask0, urbanmaskarg, figsize, outdir):
     for i, std in enumerate(sorted(stds, reverse=True)): # Traverse backwards
         k = nstds - i - 1
         info('diff step:{}'.format(std))
-        mask = hdf2numpy(pjoin(hdfdir, '{:02d}.hdf5'.format(std)))
-        inds = np.where(mask >= minpix)
-        steps[inds] = k # Keep the minimum time to achieve minpix
-
-    # from matplotlib import cm
-    # from matplotlib.colors import ListedColormap, LinearSegmentedColormap
-    # mycmap = cm.get_cmap('jet', 12)
+        mask = hdf2numpy(hdfpaths[k])
+        steps[np.where(mask >= minpix)] = k # Keep the minimum time to achieve minpix
 
     info('Saturating pixels by {}'.format(stepsat))
     steps[steps > stepsat] = stepsat
@@ -169,8 +141,6 @@ def plot_threshold(minpixarg, hdfdir, mask0, urbanmaskarg, figsize, outdir):
             )
 
     ax.set_axis_off()
-    # ax.set_title('Initial mean:{:.02f}, threshold:{:.02f}'. \
-            # format(np.mean(mask0), minpix))
     from mpl_toolkits.axes_grid1 import make_axes_locatable
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.1)
@@ -199,7 +169,6 @@ def plot_threshold(minpixarg, hdfdir, mask0, urbanmaskarg, figsize, outdir):
 
     # Store the steps
     vals, counts = np.unique(steps[urbanmask.astype(bool)], return_counts=True)
-    info(vals, counts)
     for v, c in zip(vals, counts): distr[int(v)] = c
     np.savetxt(pjoin(outdir, 'hist.csv'), distr, fmt='%d', delimiter=',')
 
@@ -225,12 +194,12 @@ def main():
 
     W = 600; H = 800; figsize=(W*.01, H*.01)
 
-    mask0 = hdf2numpy(pjoin(args.hdfdir, '00.hdf5'))
-
+    hdfpaths, stds = list_hdffiles_and_stds(args.hdfdir)
     distpath = pjoin(args.outdir, 'distransform.pdf')
-    plot_disttransform(figsize, mask0, distpath)
-
-    plot_threshold(args.minpix, args.hdfdir, mask0, args.urbanmask,
+    # plot_disttransform(figsize, hdfpaths[0], distpath)
+    minpix = np.min(hdf2numpy(hdfpaths[-1])) # Get the minpix of last iter
+    
+    plot_threshold(args.minpix, hdfpaths, stds, args.urbanmask,
             figsize, args.outdir)
 
     info('Elapsed time:{}'.format(time.time()-t0))
