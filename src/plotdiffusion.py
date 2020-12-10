@@ -23,6 +23,7 @@ from PIL import Image
 PIL.Image.MAX_IMAGE_PIXELS = 360000000
 
 RURAL = -2
+FIGSCALE = 8
 ##########################################################
 def hdf2numpy(hdfpath):
     """Convert hdf5 file to numpy """
@@ -31,12 +32,13 @@ def hdf2numpy(hdfpath):
     return data
 
 ##########################################################
-def plot_disttransform(figsize, mask0path, outdir):
+def plot_disttransform(mask0path, outdir):
     """Short description """
     info(inspect.stack()[0][3] + '()')
 
     outpath = pjoin(outdir, 'distransform.pdf')
     mask0 = hdf2numpy(mask0path)
+    figsize = (FIGSCALE, int(FIGSCALE * (mask0.shape[0] / mask0.shape[1])))
     fig, ax = plt.subplots(figsize=figsize, dpi=100)
     distransf = ndimage.distance_transform_edt(mask0.astype(int))
     im = ax.imshow(distransf)
@@ -222,13 +224,13 @@ def main():
     else:
         hdfpaths, stds = list_hdffiles_and_stds(args.hdfdir)
         print_mean_and_min(hdfpaths)
-        plot_disttransform(figsize, hdfpaths[0], args.outdir)
+        plot_disttransform(hdfpaths[0], args.outdir)
         steps = get_min_time(args.minpix, hdfpaths)
         steps = fill_non_urban_area(steps, args.urbanmask, RURAL)
         with h5py.File(stepspath, "w") as f:
             f.create_dataset("data", data=steps, dtype='f')
 
-    figsize = (8, int(8 * (steps.shape[0] / steps.shape[1])))
+    figsize = (FIGSCALE, int(FIGSCALE * (steps.shape[0] / steps.shape[1])))
 
     plot_threshold(steps, args.minpix, stepsat, args.urbanmask, figsize, args.outdir)
     plot_contour(steps, args.minpix, stepsat, args.urbanmask, figsize, args.outdir)
