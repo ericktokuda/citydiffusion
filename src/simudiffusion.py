@@ -129,16 +129,19 @@ def run_experiment(labels, diam, std, eps, maxiter, outfmt, outdir):
     plt.savefig(pjoin(outdir, 'kernel.png'))
     plt.close()
 
-    zold = labels.copy()
+    zold = labels.copy() # Keep it due to the stopping criterion
     for i in range(maxiter+1):
         info('i:{}'.format(i))
         store_data(zold, i, kerrad, outdir)
 
         if CUDA: z =  conv_gpu(ker2d, zold)
         else: z = convolve2d(zold, ker2d, mode='same')
-        z[np.where(labels == 1)] = 1
-        if i > 0 and np.linalg.norm(z - zold) < eps: break
-        else: zold = z
+
+        z[np.where(labels == 1)] = 1 # Replacing source
+
+        if i > 0 and np.linalg.norm(z - zold) < eps: break # stop criterion
+
+        zold = z
 
     return i
 
