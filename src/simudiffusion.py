@@ -185,7 +185,7 @@ def main():
                 margin[1]+dy:margin[1]+dy+samplesz]
 
     pad = args.kersize // 2
-    labels = np.ones((labels0.shape[0]+2*pad, labels0.shape[1]+2*pad), dtype=int)
+    labels = np.zeros((labels0.shape[0]+2*pad, labels0.shape[1]+2*pad), dtype=int)
     labels[pad:-pad, pad:-pad] = labels0
 
     outpath = pjoin(args.outdir, 'README.csv')
