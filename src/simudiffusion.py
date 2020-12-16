@@ -62,10 +62,11 @@ def get_circular_kernel(r, ndims):
 def colours_to_labels_from_first_coord(map_):
     """Transform colours to labels"""
     info(inspect.stack()[0][3] + '()')
+    M = np.max(map_)
     if len(map_.shape) == 2:
-        labels = map_ == 255
+        labels = map_ == M
     else:
-        labels = map_[:, :, 0] == 255
+        labels = map_[:, :, 0] == M
     return labels.astype(int)
 
 ##########################################################

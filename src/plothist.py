@@ -95,7 +95,7 @@ def get_distribs(citiesdir, outdir):
     countsall = {}
     green0 = {}
     for d in os.listdir(citiesdir):
-        if len(d) > 2: continue
+        # if len(d) > 2: continue
         citydir = pjoin(citiesdir, d)
         if not os.path.isdir(citydir): continue
         histpath = os.path.join(citydir, 'count_-1.00.txt')
