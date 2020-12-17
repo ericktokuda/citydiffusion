@@ -32,8 +32,6 @@ def plot_fits(y, outpath):
     def fdistrib(x, d1, d2):
         return  np.sqrt( ((d1*x)**d1) * (d2**d2) / ((d1*x + d2) ** (d1 + d2))) / \
             (x * scipy.special.beta(d1 / 2, d2 / 2))
-    def gammak3(x, t):
-        return  ( x**(3-1) * np.exp(-x / t) ) / np.math.factorial(3 - 1)
     def gammak4(x, t):
         return  ( x**(4-1) * np.exp(-x / t) ) / np.math.factorial(4 - 1)
     def gammak5(x, t):
@@ -46,7 +44,6 @@ def plot_fits(y, outpath):
     funcs = {}
     funcs['lognormal'] = lognormal
     funcs['f'] = fdistrib
-    funcs['gammak3'] = gammak3
     funcs['gammak4'] = gammak4
     funcs['gammak5'] = gammak5
     funcs['gammak6'] = gammak6
