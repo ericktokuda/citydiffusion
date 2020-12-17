@@ -40,6 +40,8 @@ def plot_fits(y, outpath):
         return  ( x**(5-1) * np.exp(-x / t) ) / np.math.factorial(5 - 1)
     def gammak6(x, t):
         return  ( x**(6-1) * np.exp(-x / t) ) / np.math.factorial(6 - 1)
+    def rayleigh(x, s):
+        return  ( x / (s*s) ) * np.exp(- x*x / (2 * s*s))
 
     funcs = {}
     funcs['lognormal'] = lognormal
@@ -48,6 +50,7 @@ def plot_fits(y, outpath):
     funcs['gammak4'] = gammak4
     funcs['gammak5'] = gammak5
     funcs['gammak6'] = gammak6
+    funcs['rayleigh'] = rayleigh
 
     for label, func in funcs.items():
         params, _ = curve_fit(func, x, y, maxfev=10000)
@@ -95,7 +98,7 @@ def get_distribs(citiesdir, outdir):
     countsall = {}
     green0 = {}
     for d in os.listdir(citiesdir):
-        # if len(d) > 2: continue
+        if len(d) > 2: info('Skipping ' + d); continue
         citydir = pjoin(citiesdir, d)
         if not os.path.isdir(citydir): continue
         histpath = os.path.join(citydir, 'count_-1.00.txt')
