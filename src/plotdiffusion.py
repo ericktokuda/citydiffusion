@@ -202,6 +202,38 @@ def print_mean_and_min(hdfpaths):
     info('mean0:{:.02f}, minpix:{:.02f}'.format(mean0, minlast))
 
 ##########################################################
+def plot_lastiter_distrib(hdfpaths, outdir):
+    mask = hdf2numpy(hdfpaths[-1])
+    fig, ax = plt.subplots()
+    ax.hist(mask.flatten(), density=True)
+    plt.savefig(pjoin(outdir, 'lastdistrib.png'))
+    plt.close()
+
+##########################################################
+def plot_signatures(hdfpaths, outdir):
+    points = [[200, 50], [200, 150], [200, 200], [200, 250]]
+    n = len(points)
+    vals = [[], [], [], []]
+
+    fig, ax = plt.subplots()
+
+    for i, hdfpath in enumerate(hdfpaths):
+        print(i, hdfpath)
+        mask = hdf2numpy(hdfpath)
+        for j, pt in enumerate(points):
+            vals[j].append(mask[pt[0], pt[1]])
+
+    xs = range(len(vals[0]))
+    for j, val in enumerate(vals):
+        ax.plot(xs, val, alpha=.7, label='pt{}'.format(j))
+
+    ax.set_xlabel('Time')
+    ax.set_ylabel('Pixel value')
+    plt.legend()
+    plt.savefig(pjoin(outdir, 'signature.png'))
+    plt.close()
+
+##########################################################
 def main():
     info(inspect.stack()[0][3] + '()')
     t0 = time.time()
@@ -218,6 +250,7 @@ def main():
     if args.minpix == -1: stepsat = -1
     else: stepsat = 18 # Adjust here, if args.urbanmask is set
 
+
     stepspath = pjoin(args.outdir, 'steps_{:.02f}.hdf5'.format(args.minpix))
     if os.path.exists(stepspath):
         steps = hdf2numpy(stepspath).astype(int)
@@ -229,6 +262,9 @@ def main():
         steps = fill_non_urban_area(steps, args.urbanmask, RURAL)
         with h5py.File(stepspath, "w") as f:
             f.create_dataset("data", data=steps, dtype='f')
+
+        plot_lastiter_distrib(hdfpaths, args.outdir)
+        plot_signatures(hdfpaths, args.outdir)
 
     figsize = (FIGSCALE, int(FIGSCALE * (steps.shape[0] / steps.shape[1])))
 
