@@ -15,12 +15,16 @@ import matplotlib; matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import scipy
 import scipy.stats
+import h5py
 from scipy.optimize import curve_fit
 from myutils import info, create_readme
 
 ##########################################################
+RURAL = -2
+
+##########################################################
 def plot_fits(y, outpath):
-    """Short description """
+    """Plot fits of the data"""
     info(inspect.stack()[0][3] + '()')
 
     x = np.array(list(range(1, len(y) + 1)))
@@ -60,20 +64,23 @@ def plot_fits(y, outpath):
     plt.close()
 
 ##########################################################
-def plot_histograms(countsall, outdir):
+def plot_histograms(countsall, invalidall, outdir):
     """Plot the histogram of all cities in @citiesdir and write to @outdir"""
     info(inspect.stack()[0][3] + '()')
 
-    maxlen = 0
-    for count in countsall.values():
-        if len(count) > maxlen: maxlen = len(count)
+    maxlen = 0 # Get max len
+    for relcount in countsall.values():
+        if len(relcount) > maxlen: maxlen = len(relcount)
 
     fig, ax = plt.subplots()
-    x = range(1, maxlen + 1) # We treat separately step=0 (started green)
-    for city, citycount in countsall.items():
-        n = len(citycount)
-        countrel = citycount.tolist() + [0]*(maxlen - n)
-        ax.plot(x, countrel, label=city)
+    x = range(-1, maxlen)
+    for city, c in countsall.items():
+        N = np.sum(c) + invalidall[city]
+        cityrel = (c / N ).tolist()
+        n = len(cityrel)
+        invalidrel = [invalidall[city] / N]
+        counts = invalidrel + cityrel + [0]*(maxlen - n)
+        ax.plot(x, counts, label=city)
 
     ax.set_xlabel('Time (steps)')
     plt.legend(loc='upper right')
@@ -85,7 +92,8 @@ def plot_fits_all(countsall, outdir):
     """Plot the histogram of all cities in @citiesdir and write to @outdir"""
     info(inspect.stack()[0][3] + '()')
 
-    for city, vals in countsall.items():
+    for city, v in countsall.items():
+        vals = v[1:] # Exclude -1
         plot_fits(vals, pjoin(outdir, 'fits_{}.png').format(city))
 
 ##########################################################
@@ -93,18 +101,33 @@ def get_distribs(citiesdir, minpix, outdir):
     """Plot the histogram of all cities in @citiesdir and write to @outdir"""
     info(inspect.stack()[0][3] + '()')
 
+    rural = {}
+    invalid = {}
     countsall = {}
-    green0 = {}
-    for d in os.listdir(citiesdir):
-        histpath = pjoin(citiesdir, d, 'count_{:.02f}.txt'.format(minpix))
 
-        if not os.path.exists(histpath): continue
+    for city in os.listdir(citiesdir):
+        stepspath = pjoin(citiesdir, city, 'steps_{:.02f}.hdf5'.format(minpix))
 
-        count = np.loadtxt(histpath)
-        countsall[d] = count[1:] / np.sum(count[1:])
-        green0[d] = count[0] / np.sum(count)
+        if not os.path.exists(stepspath): continue
 
-    return countsall, green0
+        rural[city] = invalid[city] = 0
+
+        with h5py.File(stepspath, 'r') as f:
+            steps = np.array(f['data']).astype(int)
+
+        vals, counts = np.unique(steps, return_counts=True)
+        ruralidx = np.where(vals == RURAL)[0]
+        invalididx = np.where(vals == -1)[0]
+
+        N = np.sum(counts) # Whole image
+
+        if len(ruralidx) > 0: rural[city] = counts[ruralidx[0]]
+        if len(invalid) > 0: invalid[city] = counts[invalididx[0]]
+
+        firstvalid = np.where(vals == 0)[0][0] # Index of the first valid
+        countsall[city] = counts[firstvalid:]
+
+    return rural, invalid, countsall, N
 
 ##########################################################
 def main():
@@ -120,9 +143,10 @@ def main():
     os.makedirs(args.outdir, exist_ok=True)
     readmepath = create_readme(sys.argv, args.outdir)
 
-    countsall, green0 = get_distribs(args.citiesdir, args.minpix, args.outdir)
-    plot_histograms(countsall, args.outdir)
-    plot_fits_all(countsall, args.outdir)
+    rural, invalid, counts, N = get_distribs(args.citiesdir, args.minpix, args.outdir)
+
+    plot_histograms(counts, invalid, args.outdir)
+    plot_fits_all(counts, args.outdir)
 
     info('Elapsed time:{}'.format(time.time()-t0))
     info('Output generated in {}'.format(args.outdir))

@@ -59,7 +59,7 @@ def list_hdffiles_and_stds(hdfdir):
     stds = []
 
     for f in sorted(os.listdir(hdfdir)):
-        if not f.endswith('.hdf5'): continue
+        if not f.endswith('.hdf5') or 'steps' in f: continue
         hdfpaths.append(pjoin(hdfdir, f))
         stds.append(int(f.replace('.hdf5', '')))
 
@@ -87,7 +87,7 @@ def parse_urban_mask(maskpath, maskshape):
 
 ##########################################################
 def get_min_time(minpixarg, hdfpaths):
-    """Short description """
+    """Get minimum time for masks in @hdfpaths to achieve @minpixarg"""
     info(inspect.stack()[0][3] + '()')
     masklast = hdf2numpy(hdfpaths[-1])
     minpix = np.min(masklast) if minpixarg < 0 else minpixarg
@@ -121,7 +121,6 @@ def plot_threshold(stepsorig, minpixarg, stepsat, urbanmaskarg, figsize, outdir)
     info(inspect.stack()[0][3] + '()')
 
     outpath = pjoin(outdir, 'heatmap_{:.02f}.pdf'.format(minpixarg))
-    if os.path.exists(outpath): return
 
     fig, ax = plt.subplots(figsize=figsize, dpi=100)
 
@@ -180,21 +179,6 @@ def plot_contour(stepsorig, minpixarg, stepsat, urbanmaskarg, figsize, outdir):
     plt.close()
 
 ##########################################################
-def store_steps_distrib(steps, minpixarg, outdir):
-    """Short description """
-    info(inspect.stack()[0][3] + '()')
-
-    countpath = pjoin(outdir, 'count_{:.02f}.txt'.format(minpixarg))
-    if os.path.exists(countpath): return
-    vals, counts = np.unique(steps, return_counts=True)
-    distr = np.zeros(np.max(vals) + 1, dtype=int)
-    for v, c in zip(vals, counts):
-        if v < 0: continue # non urban areas
-        distr[int(v)] = c
-
-    np.savetxt(countpath, distr, fmt='%d')
-
-##########################################################
 def print_mean_and_min(hdfpaths):
     """Get the mean of @mask0path and the min pixel value of @masklastpath """
     mean0 = np.mean(hdf2numpy(hdfpaths[0])) # Get the minpix of last iter
@@ -218,7 +202,6 @@ def plot_signatures(hdfpaths, outdir):
     fig, ax = plt.subplots()
 
     for i, hdfpath in enumerate(hdfpaths):
-        print(i, hdfpath)
         mask = hdf2numpy(hdfpath)
         for j, pt in enumerate(points):
             vals[j].append(mask[pt[0], pt[1]])
@@ -251,26 +234,23 @@ def main():
     else: stepsat = 18 # Adjust here, if args.urbanmask is set
 
 
-    stepspath = pjoin(args.outdir, 'steps_{:.02f}.hdf5'.format(args.minpix))
-    if os.path.exists(stepspath):
-        steps = hdf2numpy(stepspath).astype(int)
-    else:
-        hdfpaths, stds = list_hdffiles_and_stds(args.hdfdir)
-        print_mean_and_min(hdfpaths)
-        plot_disttransform(hdfpaths[0], args.outdir)
-        steps = get_min_time(args.minpix, hdfpaths)
-        steps = fill_non_urban_area(steps, args.urbanmask, RURAL)
-        with h5py.File(stepspath, "w") as f:
-            f.create_dataset("data", data=steps, dtype='f')
+    hdfpaths, stds = list_hdffiles_and_stds(args.hdfdir)
+    print_mean_and_min(hdfpaths)
+    plot_disttransform(hdfpaths[0], args.outdir)
+    steps = get_min_time(args.minpix, hdfpaths)
+    steps = fill_non_urban_area(steps, args.urbanmask, RURAL)
 
-        plot_lastiter_distrib(hdfpaths, args.outdir)
-        plot_signatures(hdfpaths, args.outdir)
+    stepspath = pjoin(args.outdir, 'steps_{:.02f}.hdf5'.format(args.minpix))
+    with h5py.File(stepspath, "w") as f:
+        f.create_dataset("data", data=steps, dtype='f')
+
+    plot_lastiter_distrib(hdfpaths, args.outdir)
+    plot_signatures(hdfpaths, args.outdir)
 
     figsize = (FIGSCALE, int(FIGSCALE * (steps.shape[0] / steps.shape[1])))
 
     plot_threshold(steps, args.minpix, stepsat, args.urbanmask, figsize, args.outdir)
     plot_contour(steps, args.minpix, stepsat, args.urbanmask, figsize, args.outdir)
-    store_steps_distrib(steps, args.minpix, args.outdir)
 
     info('Elapsed time:{}'.format(time.time()-t0))
 
