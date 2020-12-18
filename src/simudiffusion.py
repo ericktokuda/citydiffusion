@@ -84,32 +84,20 @@ def conv_gpu(ker, map_):
         filt = filt.cuda()
         img = img.cuda()
 
-    # m = torch.nn.Upsample(scale_factor=2, mode='nearest')
-    # img = m(img)
-    # m = torch.nn.AvgPool2d((2, 2), stride=(2, 2))
-    # imgout = m(imgout)
-    # model = torch.nn.Sequential(
-            # torch.nn.Upsample(scale_factor=2, mode='nearest'),
-            # torch.nn.ReflectionPad2d(1),
-            # torch.nn.Conv2d(ngf * mult, int(ngf * mult / 2), kernel_size=3, stride=1, padding=0),
-            # F.conv2d(filt, bias=None, padding=0, stride=(1, 1))
-            # )
-    # imgout = model(img)
-
     imgout = F.conv2d(img, filt, bias=None, padding=ker.shape[0]//2, stride=(1, 1))
     return imgout.cpu().numpy()[0][0]
 
 ##########################################################
 def store_data(zold, i, kerrad, outdir):
     """Store intermediate or just the final data"""
-    outpath = pjoin(outdir, '{:02d}.png'.format(i))
+    outpath = pjoin(outdir, '{:03d}.png'.format(i))
     r = kerrad
     fig = plt.figure(figsize=(20, 20))
     plt.imshow(zold[r:-r,r:-r], cmap='gray');
     plt.savefig(outpath)
     plt.close()
 
-    outpath = pjoin(outdir, '{:02d}.hdf5'.format(i))
+    outpath = pjoin(outdir, '{:03d}.hdf5'.format(i))
     with h5py.File(outpath, "w") as f:
         dset = f.create_dataset("data", data=zold[r:-r,r:-r], dtype='f')
 
@@ -161,7 +149,7 @@ def main():
     os.makedirs(args.outdir, exist_ok=True)
     readmepath = create_readme(sys.argv, args.outdir)
 
-    if (args.kersize %2) != 1: info('Please provide an ODD diameter'); return
+    if (args.kersize % 2) != 1: info('Please provide an ODD diameter'); return
     if CUDA: info('Using cuda:{}')
     else: info('NOT using cuda:{}')
 
