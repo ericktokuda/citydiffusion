@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Plot histograms
+"""Plot histograms of different simulations. It must be run after
+simudiffusion.py and plotdiffusion.py. It expect a directory structure in which each folder contains a "count_MINPIX.txt" file
 """
 
 import argparse
@@ -88,17 +89,17 @@ def plot_fits_all(countsall, outdir):
         plot_fits(vals, pjoin(outdir, 'fits_{}.png').format(city))
 
 ##########################################################
-def get_distribs(citiesdir, outdir):
+def get_distribs(citiesdir, minpix, outdir):
     """Plot the histogram of all cities in @citiesdir and write to @outdir"""
     info(inspect.stack()[0][3] + '()')
 
     countsall = {}
     green0 = {}
     for d in os.listdir(citiesdir):
-        if len(d) > 2: info('Skipping ' + d); continue
-        citydir = pjoin(citiesdir, d)
-        if not os.path.isdir(citydir): continue
-        histpath = os.path.join(citydir, 'count_-1.00.txt')
+        histpath = pjoin(citiesdir, d, 'count_{:.02f}.txt'.format(minpix))
+
+        if not os.path.exists(histpath): continue
+
         count = np.loadtxt(histpath)
         countsall[d] = count[1:] / np.sum(count[1:])
         green0[d] = count[0] / np.sum(count)
@@ -111,13 +112,15 @@ def main():
     t0 = time.time()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--citiesdir', required=True, help='Cities directory')
+    parser.add_argument('--minpix', required=True, type=float,
+                        help='Minimum pixel, suffix of the count filename')
     parser.add_argument('--outdir', default='/tmp/out/', help='Output directory')
     args = parser.parse_args()
 
     os.makedirs(args.outdir, exist_ok=True)
     readmepath = create_readme(sys.argv, args.outdir)
 
-    countsall, green0 = get_distribs(args.citiesdir, args.outdir)
+    countsall, green0 = get_distribs(args.citiesdir, args.minpix, args.outdir)
     plot_histograms(countsall, args.outdir)
     plot_fits_all(countsall, args.outdir)
 
