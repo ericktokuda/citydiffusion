@@ -16,7 +16,7 @@ import matplotlib; matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import cv2
 from skimage.transform import resize
-from PIL import Image
+import PIL; from PIL import Image
 PIL.Image.MAX_IMAGE_PIXELS = 360000000
 from myutils import info, create_readme
 
