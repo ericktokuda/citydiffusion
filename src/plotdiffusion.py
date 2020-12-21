@@ -10,7 +10,7 @@ import inspect
 
 import numpy as np
 from itertools import product
-import matplotlib as mpl; mpl.use('Agg')
+import matplotlib as mpl#; mpl.use('Agg')
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from datetime import datetime
@@ -157,6 +157,73 @@ def plot_threshold(stepsorig, minpixarg, stepsat, urbanmaskarg, figsize, outdir)
     plt.close()
 
 ##########################################################
+def plot_waterfall_3d(hdfpaths, urbmaskpath, outdir):
+    """Plot values in @steps
+    If @stepsat == -1, it finds the reachable values and ignore @stepsat.
+    """
+    info(inspect.stack()[0][3] + '()')
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from matplotlib.collections import PolyCollection
+    from matplotlib.colors import colorConverter
+    from mpl_toolkits.mplot3d import Axes3D
+
+    nonsource = ~hdf2numpy(hdfpaths[0]).astype(bool)
+    borderpts, urbmask = parse_urban_mask(urbmaskpath, nonsource.shape)
+    validids = np.logical_and(urbmask, nonsource)
+
+    nbins = 150
+    binw = 1 / nbins
+    # bins = np.arange(0, 1 + binw, binw)
+    bins = np.arange(0, 1 + .000001, binw)
+    hs = []
+    for i, f in enumerate(hdfpaths):
+        if i % 10 != 0: continue
+        if i == 0: continue
+
+        mask = hdf2numpy(f)
+        h, _ = np.histogram(mask[validids].flatten(), bins=bins)
+        h = h / np.sum(h)
+        hs.append(h)
+        # hs.append(np.log(h + 1))
+
+    Z = np.array(hs)
+    n, m = Z.shape
+
+    slc = range(n)
+    X, Y = np.meshgrid(np.arange(1, m+.0001, 1), range(n))
+
+    def waterfall(X, Y, Z, nslices):
+      cc = lambda arg: colorConverter.to_rgba(arg, alpha=0.6)
+
+      verts = []
+      for i in range(nslices):
+        verts.append(list(zip(X[i], Z[i])))
+
+      xmin = np.min(X)
+      xmax = np.max(X)
+      ymin = np.min(Y)
+      ymax = np.max(Y)
+      zmin = np.min(Z)
+      zmax = np.max(Z)
+
+      fig=plt.figure()
+      ax = Axes3D(fig)
+      # ax = plt.axes(projection='3d')
+
+      poly = PolyCollection(verts, facecolors=[cc('g')])
+      ax.add_collection3d(poly, zs=slc, zdir='y')
+      
+      # ax.plot(X, Y, Z)
+      ax.set_xlim(xmin,xmax)
+      ax.set_ylim(ymin,ymax)
+      ax.set_zlim(zmin,zmax)
+
+    waterfall(X, Y, Z, n)
+    plt.savefig(pjoin(outdir, 'waterfall.png'))
+
+##########################################################
 def plot_contour(stepsorig, minpixarg, stepsat, urbanmaskarg, figsize, outdir):
     """Plot values in @steps
     If @stepsat == -1, it finds the reachable values and ignore @stepsat.
@@ -235,7 +302,9 @@ def main():
 
 
     hdfpaths, stds = list_hdffiles_and_stds(args.hdfdir)
+    plot_waterfall_3d(hdfpaths, args.urbanmask, args.outdir)
     print_mean_and_min(hdfpaths)
+
     plot_disttransform(hdfpaths[0], args.outdir)
     steps = get_min_time(args.minpix, hdfpaths)
     steps = fill_non_urban_area(steps, args.urbanmask, RURAL)
