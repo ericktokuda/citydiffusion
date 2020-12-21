@@ -214,7 +214,7 @@ def plot_waterfall_3d(hdfpaths, urbmaskpath, outdir):
 
       poly = PolyCollection(verts, facecolors=[cc('g')])
       ax.add_collection3d(poly, zs=slc, zdir='y')
-      
+
       # ax.plot(X, Y, Z)
       ax.set_xlim(xmin,xmax)
       ax.set_ylim(ymin,ymax)
@@ -222,6 +222,44 @@ def plot_waterfall_3d(hdfpaths, urbmaskpath, outdir):
 
     waterfall(X, Y, Z, n)
     plt.savefig(pjoin(outdir, 'waterfall.png'))
+
+##########################################################
+def plot_histograms_all(hdfpaths, urbmaskpath, outdir):
+    """Plot values in @steps
+    If @stepsat == -1, it finds the reachable values and ignore @stepsat.
+    """
+    info(inspect.stack()[0][3] + '()')
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from matplotlib.collections import PolyCollection
+    from matplotlib.colors import colorConverter
+    from mpl_toolkits.mplot3d import Axes3D
+
+    nonsource = ~hdf2numpy(hdfpaths[0]).astype(bool)
+    borderpts, urbmask = parse_urban_mask(urbmaskpath, nonsource.shape)
+    validids = np.logical_and(urbmask, nonsource)
+
+    nbins = 150
+    binw = 1 / nbins
+    # bins = np.arange(0, 1 + binw, binw)
+    bins = np.arange(0, 1 + .000001, binw)
+    hs = []
+
+
+    fix, ax = plt.subplots()
+
+    hdfpaths = hdfpaths
+    for i, f in enumerate(hdfpaths):
+        if i == 0: continue # skip first iteration
+        if i % 15 != 0: continue # skip non-divisible by 15
+
+        mask = hdf2numpy(f)
+        ax.hist(mask[validids].flatten(), bins=bins, label=f, alpha=0.4)
+
+
+    plt.legend()
+    plt.savefig(pjoin(outdir, 'histall.png'))
 
 ##########################################################
 def plot_contour(stepsorig, minpixarg, stepsat, urbanmaskarg, figsize, outdir):
@@ -300,8 +338,8 @@ def main():
     if args.minpix == -1: stepsat = -1
     else: stepsat = 18 # Adjust here, if args.urbanmask is set
 
-
     hdfpaths, stds = list_hdffiles_and_stds(args.hdfdir)
+    plot_histograms_all(hdfpaths, urbmaskpath, args.outdir)
     plot_waterfall_3d(hdfpaths, args.urbanmask, args.outdir)
     print_mean_and_min(hdfpaths)
 
