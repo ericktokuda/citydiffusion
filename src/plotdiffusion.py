@@ -12,7 +12,9 @@ import numpy as np
 from itertools import product
 import matplotlib as mpl#; mpl.use('Agg')
 import matplotlib.pyplot as plt
+from matplotlib.colors import colorConverter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from mpl_toolkits.mplot3d import Axes3D
 from datetime import datetime
 import pandas as pd
 import h5py
@@ -78,7 +80,6 @@ def parse_urban_mask(maskpath, maskshape):
         mask = resize(mask, maskshape)
     else:
         mask = np.ones(maskshape, dtype=bool)
-
 
     borderpts, aux = cv2.findContours(mask.astype(np.uint8),
             cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -157,109 +158,61 @@ def plot_threshold(stepsorig, minpixarg, stepsat, urbanmaskarg, figsize, outdir)
     plt.close()
 
 ##########################################################
-def plot_waterfall_3d(hdfpaths, urbmaskpath, outdir):
-    """Plot values in @steps
-    If @stepsat == -1, it finds the reachable values and ignore @stepsat.
-    """
+def plot_histograms_2d(hdfpaths, urbmaskpath, nbins, period, outdir):
+    """Plot every @period histogram in t in 2d"""
     info(inspect.stack()[0][3] + '()')
-
-    import numpy as np
-    import matplotlib.pyplot as plt
-    from matplotlib.collections import PolyCollection
-    from matplotlib.colors import colorConverter
-    from mpl_toolkits.mplot3d import Axes3D
 
     nonsource = ~hdf2numpy(hdfpaths[0]).astype(bool)
     borderpts, urbmask = parse_urban_mask(urbmaskpath, nonsource.shape)
     validids = np.logical_and(urbmask, nonsource)
 
-    nbins = 150
     binw = 1 / nbins
-    # bins = np.arange(0, 1 + binw, binw)
-    bins = np.arange(0, 1 + .000001, binw)
+    bins = np.arange(0, 1.00001, binw)
     hs = []
-    for i, f in enumerate(hdfpaths):
-        if i % 10 != 0: continue
-        if i == 0: continue
-
-        mask = hdf2numpy(f)
-        h, _ = np.histogram(mask[validids].flatten(), bins=bins)
-        h = h / np.sum(h)
-        hs.append(h)
-        # hs.append(np.log(h + 1))
-
-    Z = np.array(hs)
-    n, m = Z.shape
-
-    slc = range(n)
-    X, Y = np.meshgrid(np.arange(1, m+.0001, 1), range(n))
-
-    def waterfall(X, Y, Z, nslices):
-      cc = lambda arg: colorConverter.to_rgba(arg, alpha=0.6)
-
-      verts = []
-      for i in range(nslices):
-        verts.append(list(zip(X[i], Z[i])))
-
-      xmin = np.min(X)
-      xmax = np.max(X)
-      ymin = np.min(Y)
-      ymax = np.max(Y)
-      zmin = np.min(Z)
-      zmax = np.max(Z)
-
-      fig=plt.figure()
-      ax = Axes3D(fig)
-      # ax = plt.axes(projection='3d')
-
-      poly = PolyCollection(verts, facecolors=[cc('g')])
-      ax.add_collection3d(poly, zs=slc, zdir='y')
-
-      # ax.plot(X, Y, Z)
-      ax.set_xlim(xmin,xmax)
-      ax.set_ylim(ymin,ymax)
-      ax.set_zlim(zmin,zmax)
-
-    waterfall(X, Y, Z, n)
-    plt.savefig(pjoin(outdir, 'waterfall.png'))
-
-##########################################################
-def plot_histograms_all(hdfpaths, urbmaskpath, outdir):
-    """Plot values in @steps
-    If @stepsat == -1, it finds the reachable values and ignore @stepsat.
-    """
-    info(inspect.stack()[0][3] + '()')
-
-    import numpy as np
-    import matplotlib.pyplot as plt
-    from matplotlib.collections import PolyCollection
-    from matplotlib.colors import colorConverter
-    from mpl_toolkits.mplot3d import Axes3D
-
-    nonsource = ~hdf2numpy(hdfpaths[0]).astype(bool)
-    borderpts, urbmask = parse_urban_mask(urbmaskpath, nonsource.shape)
-    validids = np.logical_and(urbmask, nonsource)
-
-    nbins = 150
-    binw = 1 / nbins
-    # bins = np.arange(0, 1 + binw, binw)
-    bins = np.arange(0, 1 + .000001, binw)
-    hs = []
-
 
     fix, ax = plt.subplots()
 
     hdfpaths = hdfpaths
     for i, f in enumerate(hdfpaths):
         if i == 0: continue # skip first iteration
-        if i % 15 != 0: continue # skip non-divisible by 15
+        if i % period != 0: continue # skip non-divisible by period
 
         mask = hdf2numpy(f)
-        ax.hist(mask[validids].flatten(), bins=bins, label=f, alpha=0.4)
-
+        h, aux = np.histogram(mask[validids].flatten(), bins=bins)
+        ax.plot(range(len(h)), h, label=f)
 
     plt.legend()
-    plt.savefig(pjoin(outdir, 'histall.png'))
+    plt.savefig(pjoin(outdir, 'hist2d.png'))
+
+##########################################################
+def plot_histograms_3d(hdfpaths, urbmaskpath, nbins, period, outdir):
+    """Plot every @period histogram in t in 3d"""
+    info(inspect.stack()[0][3] + '()')
+
+    nonsource = ~hdf2numpy(hdfpaths[0]).astype(bool)
+    borderpts, urbmask = parse_urban_mask(urbmaskpath, nonsource.shape)
+    validids = np.logical_and(urbmask, nonsource)
+
+    binw = 1 / nbins
+    bins = np.arange(0, 1 + .000001, binw)
+    hs = []
+
+    fix, ax = plt.subplots()
+
+    fig = plt.figure()
+    ax = fig.gca(projection='3d')
+    hdfpaths = hdfpaths
+    for i, f in enumerate(hdfpaths):
+        if i == 0: continue # skip first iteration
+        if i % period != 0: continue # skip non-divisible by 15
+
+        mask = hdf2numpy(f)
+        h, aux = np.histogram(mask[validids].flatten(), bins=bins)
+        h = h / np.sum(h)
+        mids = [(aux[j] + aux[j+1]) / 2 for j in range(nbins)]
+        ax.plot(mids, [i] * nbins, h, label=f)
+
+    plt.savefig(pjoin(outdir, 'hist3d.png'))
 
 ##########################################################
 def plot_contour(stepsorig, minpixarg, stepsat, urbanmaskarg, figsize, outdir):
@@ -320,47 +273,3 @@ def plot_signatures(hdfpaths, outdir):
     plt.legend()
     plt.savefig(pjoin(outdir, 'signature.png'))
     plt.close()
-
-##########################################################
-def main():
-    info(inspect.stack()[0][3] + '()')
-    t0 = time.time()
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--hdfdir', default='/tmp/out/', help='Hdf5 directory')
-    parser.add_argument('--urbanmask', help='Hdf5 directory')
-    parser.add_argument('--minpix', type=float, default=-1, help='Min pixel value')
-    parser.add_argument('--outdir', default='/tmp/out/', help='Output directory')
-    args = parser.parse_args()
-
-    os.makedirs(args.outdir, exist_ok=True)
-    readmepath = create_readme(sys.argv, args.outdir)
-
-    if args.minpix == -1: stepsat = -1
-    else: stepsat = 18 # Adjust here, if args.urbanmask is set
-
-    hdfpaths, stds = list_hdffiles_and_stds(args.hdfdir)
-    plot_histograms_all(hdfpaths, urbmaskpath, args.outdir)
-    plot_waterfall_3d(hdfpaths, args.urbanmask, args.outdir)
-    print_mean_and_min(hdfpaths)
-
-    plot_disttransform(hdfpaths[0], args.outdir)
-    steps = get_min_time(args.minpix, hdfpaths)
-    steps = fill_non_urban_area(steps, args.urbanmask, RURAL)
-
-    stepspath = pjoin(args.outdir, 'steps_{:.02f}.hdf5'.format(args.minpix))
-    with h5py.File(stepspath, "w") as f:
-        f.create_dataset("data", data=steps, dtype='f')
-
-    plot_lastiter_distrib(hdfpaths, args.outdir)
-    plot_signatures(hdfpaths, args.outdir)
-
-    figsize = (FIGSCALE, int(FIGSCALE * (steps.shape[0] / steps.shape[1])))
-
-    plot_threshold(steps, args.minpix, stepsat, args.urbanmask, figsize, args.outdir)
-    plot_contour(steps, args.minpix, stepsat, args.urbanmask, figsize, args.outdir)
-
-    info('Elapsed time:{}'.format(time.time()-t0))
-
-##########################################################
-if __name__ == "__main__":
-    main()

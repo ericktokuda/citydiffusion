@@ -198,7 +198,10 @@ def main():
         plot_disttransform(hdfpaths[0], outdir)
         steps = get_min_time(args.minpix, hdfpaths)
         steps = fill_non_urban_area(steps, urbpath, RURAL)
-        plot_waterfall_3d(hdfpaths, urbpath, outdir)
+        nbins = 100
+        period = 2
+        plot_histograms_2d(hdfpaths, urbpath, nbins, period, outdir)
+        plot_histograms_3d(hdfpaths, urbpath, nbins, period, outdir)
 
         stepspath = pjoin(outdir, 'steps_{:.02f}.hdf5'.format(args.minpix))
         with h5py.File(stepspath, "w") as f:
