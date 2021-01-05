@@ -192,6 +192,8 @@ def main():
         os.makedirs(outdir, exist_ok=True)
 
         urbpath = pjoin(args.urbmaskdir, city + '.png')
+        if os.path.exists(urbpath.replace('.png', '.jpg')):
+            urbpath = urbpath.replace('.png', '.jpg')
         hdfpaths, stds = list_hdffiles_and_stds(citydir)
         print_mean_and_min(hdfpaths)
 
