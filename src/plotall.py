@@ -122,7 +122,6 @@ def plot_lastiter_distribs(citiesdir, urbmaskdir, outdir):
         k = mask[urbanmask].flatten()
         h = np.histogram(k, bins=100, density=True)[0]
         # h, counts = np.unique(mask[urbanmask], return_counts=True)
-        
         ax.plot(h, label=city)
     plt.legend()
     plt.savefig(pjoin(outdir, 'lastdistrib.png'))
@@ -171,6 +170,26 @@ def get_distribs(citiesdir, minpix, outdir):
     return rural, invalid, countsall, N
 
 ##########################################################
+def get_max_nsteps_across_cities(citiesdir, minpix, urbmaskdir):
+    """Get maximum number of steps across cities to achieve minpix"""
+    info(inspect.stack()[0][3] + '()')
+    steps = get_min_time(minpix, hdfpaths)
+    steps = fill_non_urban_area(steps, urbpath, RURAL)
+    maxnstep = 0
+    for city in sorted(os.listdir(citiesdir)):
+        citydir = pjoin(citiesdir, city)
+        if city.startswith('.') or not os.path.isdir(citydir): continue
+
+        urbpath = pjoin(urbmaskdir, city + '.png')
+        if os.path.exists(urbpath.replace('.png', '.jpg')):
+            urbpath = urbpath.replace('.png', '.jpg')
+        hdfpaths, stds = list_hdffiles_and_stds(citydir)
+        steps = get_min_time(args.minpix, hdfpaths)
+        steps = fill_non_urban_area(steps, urbpath, RURAL)
+        if np.max(steps) > maxnstep: maxnstep = np.max(steps)
+    return maxnstep
+
+##########################################################
 def main():
     info(inspect.stack()[0][3] + '()')
     t0 = time.time()
@@ -184,6 +203,12 @@ def main():
 
     os.makedirs(args.outdir, exist_ok=True)
     readmepath = create_readme(sys.argv, args.outdir)
+
+    if args.minpix == -1: stepsat = -1 # Do not saturate it
+    # else: stepsat = 18 # If minpix, all images have the same color range
+    else: stepsat = get_max_nsteps_across_cities(args.citiesdir,
+                                                 args.minpix,
+                                                 args.urbmaskdir)
 
     for city in sorted(os.listdir(args.citiesdir)):
         citydir = pjoin(args.citiesdir, city)
@@ -200,26 +225,26 @@ def main():
         plot_disttransform(hdfpaths[0], outdir)
         steps = get_min_time(args.minpix, hdfpaths)
         steps = fill_non_urban_area(steps, urbpath, RURAL)
+
         nbins = 100
         period = 2
         plot_histograms_2d(hdfpaths, urbpath, nbins, period, outdir)
-        plot_histograms_3d(hdfpaths, urbpath, nbins, period, outdir)
+
+        clipval = .15
+        plot_histograms_3d(hdfpaths, urbpath, nbins, period, clipval, outdir)
 
         stepspath = pjoin(outdir, 'steps_{:.02f}.hdf5'.format(args.minpix))
         with h5py.File(stepspath, "w") as f:
             f.create_dataset("data", data=steps, dtype='f')
 
-        plot_lastiter_distrib(hdfpaths, outdir)
-        plot_signatures(hdfpaths, outdir)
+        # plot_lastiter_distrib(hdfpaths, outdir)
+        # plot_signatures(hdfpaths, outdir)
 
         figsize = (FIGSCALE, int(FIGSCALE * (steps.shape[0] / steps.shape[1])))
 
-        if args.minpix == -1: stepsat = -1
-        else: stepsat = 18 # Adjust here, if args.urbanmask is set
         plot_threshold(steps, args.minpix, stepsat, urbpath, figsize, outdir)
         plot_contour(steps, args.minpix, stepsat, urbpath, figsize, outdir)
 
-    plot_lastiter_distribs(args.outdir, args.urbmaskdir, args.outdir)
     rural, invalid, counts, N = get_distribs(args.outdir, args.minpix, args.outdir)
 
     plot_histograms(counts, invalid, args.outdir)

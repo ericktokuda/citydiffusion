@@ -128,6 +128,8 @@ def plot_threshold(stepsorig, minpixarg, stepsat, urbanmaskarg, figsize, outdir)
     steps = stepsorig.copy()
     steps[np.where(steps == RURAL)] = 0
 
+    breakpoint()
+
     if stepsat > 0:
         info('Saturating pixels by {}'.format(stepsat))
         im = ax.imshow(steps, vmin=0, vmax=stepsat)
@@ -185,7 +187,7 @@ def plot_histograms_2d(hdfpaths, urbmaskpath, nbins, period, outdir):
     plt.savefig(pjoin(outdir, 'hist2d.png'))
 
 ##########################################################
-def plot_histograms_3d(hdfpaths, urbmaskpath, nbins, period, outdir):
+def plot_histograms_3d(hdfpaths, urbmaskpath, nbins, period, clipval, outdir):
     """Plot every @period histogram in t in 3d"""
     info(inspect.stack()[0][3] + '()')
 
@@ -201,16 +203,23 @@ def plot_histograms_3d(hdfpaths, urbmaskpath, nbins, period, outdir):
 
     fig = plt.figure()
     ax = fig.gca(projection='3d')
-    hdfpaths = hdfpaths
-    for i, f in enumerate(hdfpaths):
-        if i == 0: continue # skip first iteration
-        if i % period != 0: continue # skip non-divisible by 15
+    hdfpaths = list(reversed(hdfpaths)) # Plot starting from the last step
+    n = len(hdfpaths) # due to the visualization issues
+    for j, f in enumerate(hdfpaths):
+        i = n - j - 1
+        if i == 0 or i % period != 0: continue # skip first and non-divisiable steps
 
         mask = hdf2numpy(f)
         h, aux = np.histogram(mask[validids].flatten(), bins=bins)
         h = h / np.sum(h)
         mids = [(aux[j] + aux[j+1]) / 2 for j in range(nbins)]
+
+        if clipval > 0: h[h > clipval] = clipval
+
         ax.plot(mids, [i] * nbins, h, label=f)
+        ax.set_xlabel('Pixel intensity')
+        ax.set_ylabel('Time')
+        ax.set_zlabel('Density')
 
     plt.savefig(pjoin(outdir, 'hist3d.png'))
 
