@@ -150,8 +150,8 @@ def main():
     readmepath = create_readme(sys.argv, args.outdir)
 
     if (args.kersize % 2) != 1: info('Please provide an ODD diameter'); return
-    if CUDA: info('Using cuda:{}')
-    else: info('NOT using cuda:{}')
+    if CUDA: info('Using cuda')
+    else: info('NOT using cuda')
 
     PIL.Image.MAX_IMAGE_PIXELS = 360000000
     map_ = np.asarray(Image.open(args.mask))
