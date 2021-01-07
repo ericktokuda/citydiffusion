@@ -195,7 +195,7 @@ def main():
     t0 = time.time()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--citiesdir', required=True, help='Cities directory')
-    parser.add_argument('--urbmaskdir', required=True, help='Urban mask directory')
+    parser.add_argument('--urbmaskdir', default='', help='Urban mask directory')
     parser.add_argument('--minpix', required=True, type=float,
                         help='Minimum pixel, suffix of the count filename')
     parser.add_argument('--outdir', default='/tmp/out/', help='Output directory')
@@ -205,10 +205,12 @@ def main():
     readmepath = create_readme(sys.argv, args.outdir)
 
     if args.minpix == -1: stepsat = -1 # Do not saturate it
-    # else: stepsat = 18 # If minpix, all images have the same color range
-    else: stepsat = get_max_nsteps_across_cities(args.citiesdir,
-                                                 args.minpix,
-                                                 args.urbmaskdir)
+    else: stepsat = 18 # If minpix, all images have the same color range
+
+    #TODO: not working properly yet
+    # else: stepsat = get_max_nsteps_across_cities(args.citiesdir,
+                                                 # args.minpix,
+                                                 # args.urbmaskdir)
 
     for city in sorted(os.listdir(args.citiesdir)):
         citydir = pjoin(args.citiesdir, city)

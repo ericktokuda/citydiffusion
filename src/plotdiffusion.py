@@ -74,11 +74,12 @@ def parse_urban_mask(maskpath, maskshape):
 
     import cv2
     from skimage.transform import resize
-    if maskpath:
+    if os.path.exists(maskpath):
         mask = np.asarray(Image.open(maskpath))[:, :, 0]
         mask = (mask > 128)
         mask = resize(mask, maskshape)
     else:
+        info('NOT using any urban mask')
         mask = np.ones(maskshape, dtype=bool)
 
     borderpts, aux = cv2.findContours(mask.astype(np.uint8),
@@ -90,6 +91,7 @@ def parse_urban_mask(maskpath, maskshape):
 def get_min_time(minpixarg, hdfpaths):
     """Get minimum time for masks in @hdfpaths to achieve @minpixarg"""
     info(inspect.stack()[0][3] + '()')
+
     masklast = hdf2numpy(hdfpaths[-1])
     minpix = np.min(masklast) if minpixarg < 0 else minpixarg
 
@@ -127,8 +129,6 @@ def plot_threshold(stepsorig, minpixarg, stepsat, urbanmaskarg, figsize, outdir)
 
     steps = stepsorig.copy()
     steps[np.where(steps == RURAL)] = 0
-
-    breakpoint()
 
     if stepsat > 0:
         info('Saturating pixels by {}'.format(stepsat))
@@ -183,7 +183,7 @@ def plot_histograms_2d(hdfpaths, urbmaskpath, nbins, period, outdir):
         h, aux = np.histogram(mask[validids].flatten(), bins=bins)
         ax.plot(range(len(h)), h, label=f)
 
-    plt.legend()
+    # plt.legend()
     plt.savefig(pjoin(outdir, 'hist2d.png'))
 
 ##########################################################
