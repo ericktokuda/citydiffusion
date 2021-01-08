@@ -159,7 +159,7 @@ def main():
 
     h, w = labels0.shape
     samplesz = args.samplesz
-    eps = 0
+    eps = 10
     maxiter = 100
 
     info('labels.shape:{}'.format(labels0.shape))
