@@ -148,6 +148,7 @@ def get_distrib_all(citiesdir, minpix):
     rural = {}
     invalid = {}
     countsall = {}
+    N = {}
 
     for city in os.listdir(citiesdir):
         stepspath = pjoin(citiesdir, city, 'steps_{:.02f}.hdf5'.format(minpix))
