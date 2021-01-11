@@ -55,9 +55,13 @@ def plot_fits(y, outpath):
     funcs['rayleigh'] = rayleigh
 
     for label, func in funcs.items():
-        params, _ = curve_fit(func, x, y, maxfev=10000)
-        print(params)
-        ax.plot(x, func(x, *params), label=label, alpha=.6)
+        try:
+            params, _ = curve_fit(func, x, y, maxfev=10000)
+            ax.plot(x, func(x, *params), label=label, alpha=.6)
+            print(params)
+        except Exception as e:
+            info('Could not fit {}'.format(label))
+            ax.plot(x, [0] * len(x), label=label, alpha=.6)
     ax.set_xlabel('Time (steps)')
     plt.legend(loc='upper right')
     plt.savefig(outpath)
