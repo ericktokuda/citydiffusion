@@ -141,8 +141,8 @@ def plot_fits_all(countsall, outdir):
         plot_fits(vals, pjoin(outdir, 'fits_{}.png').format(city))
 
 ##########################################################
-def get_distrib_all(citiesdir, minpix):
-    """Get the pixel distribution of every city in @citiesdir"""
+def get_distrib_all(outdir, minpix):
+    """Get the pixel distribution of every city in @outdir"""
     info(inspect.stack()[0][3] + '()')
 
     rural = {}
@@ -150,8 +150,8 @@ def get_distrib_all(citiesdir, minpix):
     countsall = {}
     N = {}
 
-    for city in os.listdir(citiesdir):
-        stepspath = pjoin(citiesdir, city, 'steps_{:.02f}.hdf5'.format(minpix))
+    for city in os.listdir(outdir):
+        stepspath = pjoin(outdir, city, 'steps_{:.02f}.hdf5'.format(minpix))
 
         if not os.path.exists(stepspath):
             info('Warning: {} does not exist!'.format(stepspath))
@@ -216,7 +216,7 @@ def main():
         plot_threshold(steps, args.minpix, stepsat, urbpath, figsize, outdir)
         plot_contour(steps, args.minpix, stepsat, urbpath, figsize, outdir)
 
-    rural, invalid, counts, N = get_distrib_all(args.citiesdir, args.minpix)
+    rural, invalid, counts, N = get_distrib_all(args.outdir, args.minpix)
 
     plot_histograms(counts, invalid, args.outdir)
     plot_fits_all(counts, args.outdir)
