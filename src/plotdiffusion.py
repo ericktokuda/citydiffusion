@@ -51,6 +51,7 @@ def plot_disttransform(mask0path, outdir):
     cbar.set_label('Distance', labelpad=15, rotation=-90)
     plt.tight_layout()
     plt.savefig(outpath)
+    plt.close()
 
 ##########################################################
 def list_hdffiles_and_stds(hdfdir):
@@ -185,6 +186,7 @@ def plot_histograms_2d(hdfpaths, urbmaskpath, nbins, period, outdir):
 
     # plt.legend()
     plt.savefig(pjoin(outdir, 'hist2d.png'))
+    plt.close()
 
 ##########################################################
 def plot_histograms_3d(hdfpaths, urbmaskpath, nbins, period, clipval,
@@ -230,6 +232,7 @@ def plot_histograms_3d(hdfpaths, urbmaskpath, nbins, period, clipval,
     ax.set_zlabel('Density')
 
     plt.savefig(pjoin(outdir, 'hist3d.png'))
+    plt.close()
 
 ##########################################################
 def plot_contour(stepsorig, minpixarg, stepsat, urbanmaskarg, figsize, outdir):
@@ -290,3 +293,28 @@ def plot_signatures(hdfpaths, outdir):
     plt.legend()
     plt.savefig(pjoin(outdir, 'signature.png'))
     plt.close()
+
+
+##########################################################
+def get_step_distrib(stepspath):
+    """Get distribution of steps """
+    info(inspect.stack()[0][3] + '()')
+
+    rural = invalid = 0
+
+    with h5py.File(stepspath, 'r') as f:
+        steps = np.array(f['data']).astype(int)
+
+    vals, counts = np.unique(steps, return_counts=True)
+    ruralidx = np.where(vals == RURAL)[0]
+    invalididx = np.where(vals == -1)[0]
+
+    N = np.sum(counts) # Whole image
+
+    if len(ruralidx) > 0: rural = counts[ruralidx[0]]
+    if len(invalid) > 0: invalid = counts[invalididx[0]]
+
+    firstvalid = np.where(vals == 0)[0][0] # Index of the first valid
+    countsall = counts[firstvalid:]
+
+    return rural, invalid, countsall, N

@@ -141,8 +141,8 @@ def plot_fits_all(countsall, outdir):
         plot_fits(vals, pjoin(outdir, 'fits_{}.png').format(city))
 
 ##########################################################
-def get_distribs(citiesdir, minpix, outdir):
-    """Plot the histogram of all cities in @citiesdir and write to @outdir"""
+def get_distrib_all(citiesdir, minpix):
+    """Get the pixel distribution of every city in @citiesdir"""
     info(inspect.stack()[0][3] + '()')
 
     rural = {}
@@ -152,24 +152,12 @@ def get_distribs(citiesdir, minpix, outdir):
     for city in os.listdir(citiesdir):
         stepspath = pjoin(citiesdir, city, 'steps_{:.02f}.hdf5'.format(minpix))
 
-        if not os.path.exists(stepspath): continue
+        if not os.path.exists(stepspath):
+            info('Warning: {} does not exist!'.format(stepspath))
+            continue
 
-        rural[city] = invalid[city] = 0
-
-        with h5py.File(stepspath, 'r') as f:
-            steps = np.array(f['data']).astype(int)
-
-        vals, counts = np.unique(steps, return_counts=True)
-        ruralidx = np.where(vals == RURAL)[0]
-        invalididx = np.where(vals == -1)[0]
-
-        N = np.sum(counts) # Whole image
-
-        if len(ruralidx) > 0: rural[city] = counts[ruralidx[0]]
-        if len(invalid) > 0: invalid[city] = counts[invalididx[0]]
-
-        firstvalid = np.where(vals == 0)[0][0] # Index of the first valid
-        countsall[city] = counts[firstvalid:]
+        rural[city], invalid[city], countsall[city], N[city] = \
+            get_step_distrib(stepspath)
 
     return rural, invalid, countsall, N
 
@@ -227,7 +215,7 @@ def main():
         plot_threshold(steps, args.minpix, stepsat, urbpath, figsize, outdir)
         plot_contour(steps, args.minpix, stepsat, urbpath, figsize, outdir)
 
-    rural, invalid, counts, N = get_distribs(args.outdir, args.minpix, args.outdir)
+    rural, invalid, counts, N = get_distrib_all(args.citiesdir, args.minpix)
 
     plot_histograms(counts, invalid, args.outdir)
     plot_fits_all(counts, args.outdir)
