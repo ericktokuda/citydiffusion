@@ -136,7 +136,7 @@ def plot_threshold(stepsorig, minpixarg, stepsat, urbanmaskarg, figsize, outdir)
         bounds = np.arange(0, stepsat + 1, 1)
     else:
         im = ax.imshow(steps)
-        bounds = np.arange(0, np.max(steps) + 1, 1)
+        bounds = np.arange(np.min(steps), np.max(steps))
                 # cmap=mycmap,
                 # norm=matplotlib.colors.LogNorm(vmin=steps.min(), vmax=steps.max()),
 
@@ -187,7 +187,8 @@ def plot_histograms_2d(hdfpaths, urbmaskpath, nbins, period, outdir):
     plt.savefig(pjoin(outdir, 'hist2d.png'))
 
 ##########################################################
-def plot_histograms_3d(hdfpaths, urbmaskpath, nbins, period, clipval, outdir):
+def plot_histograms_3d(hdfpaths, urbmaskpath, nbins, period, clipval,
+                       maxsteps, outdir):
     """Plot every @period histogram in t in 3d"""
     info(inspect.stack()[0][3] + '()')
 
@@ -203,10 +204,9 @@ def plot_histograms_3d(hdfpaths, urbmaskpath, nbins, period, clipval, outdir):
 
     fig = plt.figure()
     ax = fig.gca(projection='3d')
-    hdfpaths = list(reversed(hdfpaths)) # Plot starting from the last step
     n = len(hdfpaths) # due to the visualization issues
-    for j, f in enumerate(hdfpaths):
-        i = n - j - 1
+
+    for i, f in enumerate(hdfpaths):
         if i == 0 or i % period != 0: continue # skip first and non-divisiable steps
 
         mask = hdf2numpy(f)
@@ -216,10 +216,18 @@ def plot_histograms_3d(hdfpaths, urbmaskpath, nbins, period, clipval, outdir):
 
         if clipval > 0: h[h > clipval] = clipval
 
-        ax.plot(mids, [i] * nbins, h, label=f)
-        ax.set_xlabel('Pixel intensity')
-        ax.set_ylabel('Time')
-        ax.set_zlabel('Density')
+        ax.plot(mids, [i] * nbins, h, label=f, zorder=(maxsteps - i))
+
+    # One of the simulation stop criteria the pixels do not change
+    # (within epsilon) anymore its values
+
+    for j in range(i, maxsteps):
+        if j % period != 0: continue
+        ax.plot(mids, [j] * nbins, h, label=f, zorder=(maxsteps - j))
+
+    ax.set_xlabel('Pixel intensity')
+    ax.set_ylabel('Time')
+    ax.set_zlabel('Density')
 
     plt.savefig(pjoin(outdir, 'hist3d.png'))
 

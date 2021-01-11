@@ -208,8 +208,9 @@ def main():
     os.makedirs(args.outdir, exist_ok=True)
     readmepath = create_readme(sys.argv, args.outdir)
 
-    if args.minpix == -1: stepsat = -1 # Do not saturate it
-    else: stepsat = 18 # If minpix, all images have the same color range
+    # if args.minpix == -1: stepsat = -1 # Do not saturate it
+    # else: stepsat = 18 # If minpix, all images have the same color range
+    stepsat = -1
 
     #TODO: not working properly yet
     # else: stepsat = get_max_nsteps_across_cities(args.citiesdir,
@@ -237,7 +238,9 @@ def main():
         plot_histograms_2d(hdfpaths, urbpath, nbins, period, outdir)
 
         clipval = .15
-        plot_histograms_3d(hdfpaths, urbpath, nbins, period, clipval, outdir)
+        maxsteps = 100
+        plot_histograms_3d(hdfpaths, urbpath, nbins, period, clipval,
+                           maxsteps, outdir)
 
         stepspath = pjoin(outdir, 'steps_{:.02f}.hdf5'.format(args.minpix))
         with h5py.File(stepspath, "w") as f:
