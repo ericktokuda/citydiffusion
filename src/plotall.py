@@ -174,26 +174,6 @@ def get_distribs(citiesdir, minpix, outdir):
     return rural, invalid, countsall, N
 
 ##########################################################
-def get_max_nsteps_across_cities(citiesdir, minpix, urbmaskdir):
-    """Get maximum number of steps across cities to achieve minpix"""
-    info(inspect.stack()[0][3] + '()')
-    steps = get_min_time(minpix, hdfpaths)
-    steps = fill_non_urban_area(steps, urbpath, RURAL)
-    maxnstep = 0
-    for city in sorted(os.listdir(citiesdir)):
-        citydir = pjoin(citiesdir, city)
-        if city.startswith('.') or not os.path.isdir(citydir): continue
-
-        urbpath = pjoin(urbmaskdir, city + '.png')
-        if os.path.exists(urbpath.replace('.png', '.jpg')):
-            urbpath = urbpath.replace('.png', '.jpg')
-        hdfpaths, stds = list_hdffiles_and_stds(citydir)
-        steps = get_min_time(args.minpix, hdfpaths)
-        steps = fill_non_urban_area(steps, urbpath, RURAL)
-        if np.max(steps) > maxnstep: maxnstep = np.max(steps)
-    return maxnstep
-
-##########################################################
 def main():
     info(inspect.stack()[0][3] + '()')
     t0 = time.time()
@@ -208,14 +188,7 @@ def main():
     os.makedirs(args.outdir, exist_ok=True)
     readmepath = create_readme(sys.argv, args.outdir)
 
-    # if args.minpix == -1: stepsat = -1 # Do not saturate it
-    # else: stepsat = 18 # If minpix, all images have the same color range
     stepsat = -1
-
-    #TODO: not working properly yet
-    # else: stepsat = get_max_nsteps_across_cities(args.citiesdir,
-                                                 # args.minpix,
-                                                 # args.urbmaskdir)
 
     for city in sorted(os.listdir(args.citiesdir)):
         citydir = pjoin(args.citiesdir, city)
