@@ -312,7 +312,7 @@ def get_step_distrib(stepspath):
     N = np.sum(counts) # Whole image
 
     if len(ruralidx) > 0: rural = counts[ruralidx[0]]
-    if len(invalid) > 0: invalid = counts[invalididx[0]]
+    if len(invalididx) > 0: invalid = counts[invalididx[0]]
 
     firstvalid = np.where(vals == 0)[0][0] # Index of the first valid
     countsall = counts[firstvalid:]
