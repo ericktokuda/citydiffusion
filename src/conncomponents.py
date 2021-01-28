@@ -8,16 +8,22 @@ from os.path import join as pjoin
 import inspect
 
 import sys, PIL
+import pickle as pkl
 import numpy as np
 import matplotlib; matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from myutils import info, create_readme
+from myutils import info, create_readme, append_to_file
 from skimage import measure, filters, morphology
 
 ##########################################################
 def get_connected_components(maskorig, areathresh, outdir):
     """Get the connected components considering an 8-connectivity"""
     info(inspect.stack()[0][3] + '()')
+
+    outpath = pjoin(outdir, 'components.pkl')
+    if os.path.exists(outpath):
+        info('Loading cached components file')
+        return pkl.load(open(outpath, 'rb'))
 
     if maskorig.ndim > 2: mask = maskorig[:, :, 0]
     else: mask = maskorig
@@ -26,6 +32,7 @@ def get_connected_components(maskorig, areathresh, outdir):
     comps =  morphology.area_opening(comps, area_threshold=areathresh)
     comps =  morphology.area_closing(comps, area_threshold=areathresh)
     m = len(np.unique(comps))
+    pkl.dump(comps, open(outpath, 'wb'))
     info('Number of components:{}, {}'.format(n, m))
     return comps
 
@@ -41,34 +48,72 @@ def plot_distribution(comps, outdir):
     plt.savefig(pjoin(outdir, 'hist_zoom0.png'))
     plt.close()
 
-    inds = np.where( (counts > 0) & (counts < 25000))
+    inds = np.where( (counts > 0) & (counts < 5000))
     plt.hist(counts[inds], bins=30)
     plt.xlabel('Area of the component'); plt.ylabel('Number of components')
     plt.savefig(pjoin(outdir, 'hist_zoom1.png'))
     plt.close()
 
-    inds = np.where( (counts > 0) & (counts < 5000))
+    inds = np.where( (counts > 0) & (counts < 100))
     plt.hist(counts[inds], bins=30)
     plt.xlabel('Area of the component'); plt.ylabel('Number of components')
     plt.savefig(pjoin(outdir, 'hist_zoom2.png'))
     plt.close()
 
 ##########################################################
-def plot_connected_comps(mask, comps, outdir):
+def plot_connected_comps(mask, comps, minarea1, minarea2, outdir):
     """Plot the connected components """
     info(inspect.stack()[0][3] + '()')
+    aux = np.random.rand(256,3)
+    aux[0, :] = [0, 0, 0] # black background
+    cmap = matplotlib.colors.ListedColormap(aux)
 
-    cmap = matplotlib.colors.ListedColormap(np.random.rand(256,3))
-
-    nrows = 1;  ncols = 2; figscale = 2
+    nrows = 1;  ncols = 4; figscale = 16
     fig, axs = plt.subplots(nrows, ncols, squeeze=False,
                 figsize=(ncols*figscale, nrows*figscale))
 
     axs[0, 0].imshow(mask, cmap='gray')
     axs[0, 1].imshow(comps, cmap=cmap)
+
+    filtered = filter_by_area(comps, minarea1)
+    axs[0, 2].imshow(filtered, cmap=cmap)
+    filtered[np.where(filtered > 0)] = 255
+    im = PIL.Image.fromarray(filtered.astype(np.uint8))
+    im.save(pjoin(outdir, 'filtered_{}.png'.format(minarea1)))
+    info('np.sum(filtered):{}'.format(np.sum(filtered)))
+
+    filtered = filter_by_area(comps, minarea2)
+    axs[0, 3].imshow(filtered, cmap=cmap)
+    filtered[np.where(filtered > 0)] = 255
+    im = PIL.Image.fromarray(filtered.astype(np.uint8))
+    im.save(pjoin(outdir, 'filtered_{}.png'.format(minarea2)))
+    info('np.sum(filtered):{}'.format(np.sum(filtered)))
+
     plt.axis('off')
     plt.tight_layout()
     plt.savefig(pjoin(outdir, 'plot.png'))
+
+##########################################################
+def get_quantiles(comps, delta, outdir):
+    """Get percentiles"""
+    ticks = np.arange(0, 1.00001, delta)
+    vals, counts = np.unique(comps, return_counts=True)
+    quantiles = np.quantile(counts[1:], ticks)
+    info('vals:{}, quantiles:{}'.format(vals, quantiles))
+    txt = '{}\n{}'.format(ticks, quantiles)
+    append_to_file(pjoin(outdir, 'percentiles.csv'), txt)
+    return quantiles
+
+##########################################################
+def filter_by_area(compsorig, minarea):
+    """Filter by area=@minarea"""
+    info(inspect.stack()[0][3] + '()')
+    comps = compsorig.copy()
+    vals, counts = np.unique(comps, return_counts=True)
+    inds = np.where(counts < minarea)
+    mask = np.isin(comps, vals[inds])
+    comps[mask] = 0
+    return comps
 
 ##########################################################
 def main():
@@ -83,12 +128,14 @@ def main():
     os.makedirs(args.outdir, exist_ok=True)
     readmepath = create_readme(sys.argv, args.outdir)
 
-    areathresh = 9
-
     mask = np.array(PIL.Image.open(args.mask))
-    comps = get_connected_components(mask, areathresh, args.outdir)
+    comps = get_connected_components(mask, 4, args.outdir)
     plot_distribution(comps, args.outdir)
-    plot_connected_comps(mask, comps, args.outdir)
+    ZOOMSCALE = 512 / 32 # Scale used in the diffusion
+    minarea1 = (40 * 40) * 5 / ZOOMSCALE
+    minarea2 = (200 * 200) * 2 / ZOOMSCALE
+    plot_connected_comps(mask, comps, minarea1, minarea2, args.outdir)
+    # quantiles = get_quantiles(comps, .25, args.outdir)
 
     info('Elapsed time:{}'.format(time.time()-t0))
     info('Output generated in {}'.format(args.outdir))
