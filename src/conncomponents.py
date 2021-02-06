@@ -75,18 +75,32 @@ def plot_connected_comps(mask, comps, minarea1, minarea2, outdir):
     axs[0, 0].imshow(mask, cmap='gray')
     axs[0, 1].imshow(comps, cmap=cmap)
 
-    filtered = filter_by_area(comps, minarea1)
+    filtered = filter_by_area(comps, minarea1, keep='gt')
     axs[0, 2].imshow(filtered, cmap=cmap)
     filtered[np.where(filtered > 0)] = 255
     im = PIL.Image.fromarray(filtered.astype(np.uint8))
     im.save(pjoin(outdir, 'filtered_{}.png'.format(minarea1)))
     info('np.sum(filtered):{}'.format(np.sum(filtered)))
 
-    filtered = filter_by_area(comps, minarea2)
+    filtered = filter_by_area(comps, minarea2, keep='gt')
     axs[0, 3].imshow(filtered, cmap=cmap)
     filtered[np.where(filtered > 0)] = 255
     im = PIL.Image.fromarray(filtered.astype(np.uint8))
     im.save(pjoin(outdir, 'filtered_{}.png'.format(minarea2)))
+    info('np.sum(filtered):{}'.format(np.sum(filtered)))
+
+    filtered = filter_by_area(comps, minarea2, keep='gt')
+    axs[0, 3].imshow(filtered, cmap=cmap)
+    filtered[np.where(filtered > 0)] = 255
+    im = PIL.Image.fromarray(filtered.astype(np.uint8))
+    im.save(pjoin(outdir, 'filtered_{}.png'.format(minarea2)))
+    info('np.sum(filtered):{}'.format(np.sum(filtered)))
+
+    filtered = filter_by_area(comps, minarea1, keep='lt')
+    axs[0, 3].imshow(filtered, cmap=cmap)
+    filtered[np.where(filtered > 0)] = 255
+    im = PIL.Image.fromarray(filtered.astype(np.uint8))
+    im.save(pjoin(outdir, 'filtered_{}_lt.png'.format(minarea1)))
     info('np.sum(filtered):{}'.format(np.sum(filtered)))
 
     plt.axis('off')
@@ -105,16 +119,31 @@ def get_quantiles(comps, delta, outdir):
     return quantiles
 
 ##########################################################
-def filter_by_area(compsorig, minarea):
-    """Filter by area=@minarea"""
+def filter_by_area(compsorig, refarea, keep='gt'):
+    """Filter by area=@refarea"""
     info(inspect.stack()[0][3] + '()')
     comps = compsorig.copy()
-    vals, counts = np.unique(comps, return_counts=True)
-    inds = np.where(counts < minarea)
-    mask = np.isin(comps, vals[inds])
-    comps[mask] = 0
+    vals, areas = np.unique(comps, return_counts=True)
+
+    if keep == 'gt':
+        delinds = np.where(areas < refarea)
+    elif keep == 'lt':
+        delinds = np.where(areas > refarea)
+
+    delmask = np.isin(comps, vals[delinds])
+    comps[delmask] = 0
     return comps
 
+#########################################################
+# def keep_maxarea(compsorig, maxarea):
+    # """Filter by area=@minarea"""
+    # info(inspect.stack()[0][3] + '()')
+    # comps = compsorig.copy()
+    # vals, counts = np.unique(comps, return_counts=True)
+    # inds = np.where(counts < minarea)
+    # mask = np.isin(comps, vals[inds])
+    # comps[mask] = 0
+    # return comps
 ##########################################################
 def main():
     info(inspect.stack()[0][3] + '()')
