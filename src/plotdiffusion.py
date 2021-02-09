@@ -230,7 +230,9 @@ def plot_histograms_3d(hdfpaths, urbmaskpath, nbins, period, clipval,
     ax.set_xlabel('Pixel intensity')
     ax.set_ylabel('Time')
     ax.set_zlabel('Density')
+    ax.set_zlim3d(0, 0.14)
 
+    plt.tight_layout()
     plt.savefig(pjoin(outdir, 'hist3d.png'))
     plt.close()
 
