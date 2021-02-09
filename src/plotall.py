@@ -18,6 +18,7 @@ import h5py
 from scipy.optimize import curve_fit
 from myutils import info, create_readme
 from plotdiffusion import *
+import shutil
 
 ##########################################################
 RURAL = -2
@@ -189,6 +190,11 @@ def main():
         if os.path.exists(urbpath.replace('.png', '.jpg')):
             urbpath = urbpath.replace('.png', '.jpg')
         hdfpaths, stds = list_hdffiles_and_stds(citydir)
+
+        for ii in [0, -1]: # Copy first and last images
+            imgpath = pjoin(outdir, hdfpaths[ii].replace('.hdf5', '.png'))
+            if os.path.exists(lastimgpath): shutil.copy(lastimgpath, outdir)
+
         print_mean_and_min(hdfpaths)
 
         plot_disttransform(hdfpaths[0], outdir)
