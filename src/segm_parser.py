@@ -13,6 +13,7 @@ from myutils import info, create_readme, graph, geo
 import igraph
 import imageio
 import pandas as pd
+from PIL import Image
 
 ##########################################################
 def deg2num(lon_deg, lat_deg, zoom, imgsize=256):
@@ -144,6 +145,51 @@ def get_geodesic_mask(realdist, lonref, latref, zoom, imgsize):
             d = geo.haversine(lon0, lat0, lon1, lat1)
             if d < realdist: mask[i, j] = True
     return mask
+
+    b1 = interp(a1, a0, b0, a2, b2)
+##########################################################
+def interp(a1, a0, b0, a2, b2):
+    """Linearly interpolate a1 to obtain b1 considering the simmetries
+    a0,b0 and a2,b2"""
+    info(inspect.stack()[0][3] + '()')
+    return (a1 - a0) / (a2 - a0) * (b2 - b0) + b0
+##########################################################
+def trim_graph(graphmlpath, maskpath, rect, outpath):
+    """Crop the graph (@graphmlpath) considering the @mask, with extremities
+    given by @rec (xmin, ymin, xmax, ymax) and outputs to @outpath"""
+    info(inspect.stack()[0][3] + '()')
+    g = igraph.Graph.Read(graphmlpath)
+    x = np.array(Image.open(maskpath))
+    # import shapely
+    if x.ndim == 3:
+        # mask = mask[:, :, 0]
+        x = 0.299*x[:, :, 0] + 0.587*x[:, :, 1] + 0.114*x[:, :, 2]
+    x = np.where(x > 128, 1, 0).astype(np.uint8)
+    
+    # from skimage import measure
+    # contours = measure.find_contours(x, 0.8)
+    # import matplotlib.pyplot as plt
+    # for contour in contours:
+        # plt.plot(contour[:, 1], -contour[:, 0], linewidth=2)
+    # plt.savefig('/tmp/out.png')
+
+    import rasterio.features
+    import shapely.geometry
+    shapes = rasterio.features.shapes(x)
+    polygons = [shapely.geometry.Polygon(shape[0]["coordinates"][0]) for shape in shapes if shape[1] == 1]
+    ul = [rect[0], rect[1]]
+    lr = [rect[2] + 1, rect[3] + 1] # We want the lower right corner
+    latmax, lonmin = num2deg(ul[0], ul[1], 18)
+    latmin, lonmax = num2deg(lr[0], lr[1], 18)
+    # b1 = interp(a1, a0, b0, a2, b2) #a:latlon,  b:pixels
+
+    lat1 = -12.25
+    lon1 = -38.95
+    
+    y1 = interp(lat1, latmin, 0, latmax, x.shape[0])
+    x1 = interp(lon1, lonmin, 0, lonmax, x.shape[1])
+    breakpoint()
+
 
 ##########################################################
 def main():
