@@ -9,11 +9,13 @@ import sys
 import numpy as np
 import matplotlib; matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from myutils import info, create_readme, graph, geo
+from myutils import info, create_readme, graph, geo, plot
 import igraph
 import imageio
 import pandas as pd
 from PIL import Image
+import rasterio.features
+import shapely.geometry
 
 ##########################################################
 def deg2num(lon_deg, lat_deg, zoom, imgsize=256):
@@ -111,7 +113,7 @@ def get_circle_mask(radiuspix):
     radius2 = radiuspix ** 2
 
     circlemask = np.zeros((n, n), dtype=bool)
-    for i in range(n):                                                                    
+    for i in range(n):
         for j in range(n):
             if (i - x0)**2 + (j - y0)**2 < radius2:
                 circlemask[i, j] = True
@@ -151,45 +153,64 @@ def get_geodesic_mask(realdist, lonref, latref, zoom, imgsize):
 def interp(a1, a0, b0, a2, b2):
     """Linearly interpolate a1 to obtain b1 considering the simmetries
     a0,b0 and a2,b2"""
-    info(inspect.stack()[0][3] + '()')
+    # info(inspect.stack()[0][3] + '()')
     return (a1 - a0) / (a2 - a0) * (b2 - b0) + b0
-##########################################################
-def trim_graph(graphmlpath, maskpath, rect, outpath):
-    """Crop the graph (@graphmlpath) considering the @mask, with extremities
-    given by @rec (xmin, ymin, xmax, ymax) and outputs to @outpath"""
-    info(inspect.stack()[0][3] + '()')
-    g = igraph.Graph.Read(graphmlpath)
-    x = np.array(Image.open(maskpath))
-    # import shapely
-    if x.ndim == 3:
-        # mask = mask[:, :, 0]
-        x = 0.299*x[:, :, 0] + 0.587*x[:, :, 1] + 0.114*x[:, :, 2]
-    x = np.where(x > 128, 1, 0).astype(np.uint8)
-    
-    # from skimage import measure
-    # contours = measure.find_contours(x, 0.8)
-    # import matplotlib.pyplot as plt
-    # for contour in contours:
-        # plt.plot(contour[:, 1], -contour[:, 0], linewidth=2)
-    # plt.savefig('/tmp/out.png')
 
-    import rasterio.features
-    import shapely.geometry
-    shapes = rasterio.features.shapes(x)
+##########################################################
+def trim_graph(graphmlpath, maskpath, rect, outdir):
+    """Crop the graph (@graphmlpath) considering the @mask, with extremities
+    given by @rec (xmin, ymin, xmax, ymax) and outputs to @outdir"""
+    info(inspect.stack()[0][3] + '()')
+    g = graph.simplify_graphml(graphmlpath) # g = igraph.Graph.Read(graphmlpath)
+    mask = np.array(Image.open(maskpath))
+    if mask.ndim == 3:
+        mask = 0.299*mask[:, :, 0] + 0.587*mask[:, :, 1] + 0.114*mask[:, :, 2]
+    mask = np.where(mask > 128, 1, 0).astype(np.uint8)
+
+    shapes = rasterio.features.shapes(mask)
     polygons = [shapely.geometry.Polygon(shape[0]["coordinates"][0]) for shape in shapes if shape[1] == 1]
     ul = [rect[0], rect[1]]
     lr = [rect[2] + 1, rect[3] + 1] # We want the lower right corner
     latmax, lonmin = num2deg(ul[0], ul[1], 18)
     latmin, lonmax = num2deg(lr[0], lr[1], 18)
-    # b1 = interp(a1, a0, b0, a2, b2) #a:latlon,  b:pixels
 
-    lat1 = -12.25
-    lon1 = -38.95
-    
-    y1 = interp(lat1, latmin, 0, latmax, x.shape[0])
-    x1 = interp(lon1, lonmin, 0, lonmax, x.shape[1])
-    breakpoint()
+    info('g.vcount():{}'.format(g.vcount()))
+    majpolygon = polygons[np.argmax([p.area for p in polygons])]
 
+    # lat1 = -12.25
+    # lon1 = -38.95
+    # y1 = interp(lat1, latmin, 0, latmax, mask.shape[0])
+    # x1 = interp(lon1, lonmin, 0, lonmax, mask.shape[1])
+    # p = shapely.geometry.Point([x1, y1])
+    # contains = majpolygon.contains(p)
+    # info('pol.contains(p):{}'.format(contains))
+
+    xs, ys = np.array(g.vs['x']), np.array(g.vs['y'])
+
+    info('Identifying points inside the mask...')
+
+    pixcoords = np.ndarray((g.vcount(), 2), dtype=float)
+    inside = np.zeros(g.vcount(), dtype=bool)
+    for i in range(g.vcount()):
+        y1 = interp(ys[i], latmin, 0, latmax, mask.shape[0])
+        x1 = interp(xs[i], lonmin, 0, lonmax, mask.shape[1])
+        pixcoords[i, :] = x1, y1
+        p = shapely.geometry.Point([x1, y1])
+        inside[i] = majpolygon.contains(p)
+
+    info('Plotting...')
+    plt.figure(figsize=(16, 16))
+    plt.imshow(mask)
+    plt.scatter(pixcoords[:, 0][inside], pixcoords[:, 1][inside], c='k')
+    plt.savefig(pjoin(outdir, 'masked.png'))
+
+    g2 = g.induced_subgraph(np.where(inside)[0])
+    g3 = g2.components(mode='weak').giant()
+
+    figscale = .003
+    _, ax = plt.subplots(figsize=(mask.shape[1]*figscale, mask.shape[0]*figscale))
+    plot.plot_graph(g3, pjoin(outdir, 'map.png'), inverty=True, ax=ax)
+    return g3
 
 ##########################################################
 def main():
@@ -214,7 +235,7 @@ def main():
     g = graph.simplify_graphml(args.graphml, directed=False)
     info('nvertices:{}, nedges:{}'.format(g.vcount(), g.ecount()))
     coords = np.array([ [float(v['x']), float(v['y'])] for v in g.vs ])
-    
+
     radiuspix = get_deltapix_from_dist(args.ballradius, np.mean(coords[:, 0]),
             np.mean(coords[:, 1]), zoom, imgsize)
     roimask = get_circle_mask(radiuspix) # For short distances, it is a good approx
@@ -230,7 +251,7 @@ def main():
         info('i:{}'.format(i))
         grid, pos = get_enclosing_grid(v[0], v[1], zoom, imgsize, args.mskdir, m)
         counts[i, :] = get_counts(grid, pos, roimask, list(labels.values()))
-    
+
     info('Exporting counts to {}'.format(countspath))
     df = pd.DataFrame({'lon': coords[:, 0], 'lat': coords[:, 1]})
     for i in range(counts.shape[1]):
