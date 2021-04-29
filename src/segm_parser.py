@@ -16,6 +16,7 @@ import pandas as pd
 from PIL import Image
 import rasterio.features
 import shapely.geometry
+import pickle
 
 ##########################################################
 def deg2num(lon_deg, lat_deg, zoom, imgsize=256):
@@ -177,14 +178,6 @@ def trim_graph(graphmlpath, maskpath, rect, outdir):
     info('g.vcount():{}'.format(g.vcount()))
     majpolygon = polygons[np.argmax([p.area for p in polygons])]
 
-    # lat1 = -12.25
-    # lon1 = -38.95
-    # y1 = interp(lat1, latmin, 0, latmax, mask.shape[0])
-    # x1 = interp(lon1, lonmin, 0, lonmax, mask.shape[1])
-    # p = shapely.geometry.Point([x1, y1])
-    # contains = majpolygon.contains(p)
-    # info('pol.contains(p):{}'.format(contains))
-
     xs, ys = np.array(g.vs['x']), np.array(g.vs['y'])
 
     info('Identifying points inside the mask...')
@@ -210,6 +203,7 @@ def trim_graph(graphmlpath, maskpath, rect, outdir):
     figscale = .003
     _, ax = plt.subplots(figsize=(mask.shape[1]*figscale, mask.shape[0]*figscale))
     plot.plot_graph(g3, pjoin(outdir, 'map.png'), inverty=True, ax=ax)
+    pickle.dump(g3, open(pjoin(outdir, 'masked.pkl'), 'wb'))
     return g3
 
 ##########################################################
