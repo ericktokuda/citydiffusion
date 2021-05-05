@@ -202,8 +202,60 @@ def trim_graph(graphmlpath, maskpath, rect, outdir):
 
     figscale = .003
     _, ax = plt.subplots(figsize=(mask.shape[1]*figscale, mask.shape[0]*figscale))
-    plot.plot_graph(g3, pjoin(outdir, 'map.png'), inverty=True, ax=ax)
+    plot.plot_graph(g3, pjoin(outdir, 'map.png'), ax=ax)
     pickle.dump(g3, open(pjoin(outdir, 'masked.pkl'), 'wb'))
+    return g3
+
+##########################################################
+def trim_xnet(xnetpath, maskpath, rect, outdir):
+    """Crop the graph (@graphmlpath) considering the @mask, with extremities
+    given by @rec (xmin, ymin, xmax, ymax) and outputs to @outdir"""
+    info(inspect.stack()[0][3] + '()')
+    from myutils import xnet
+    g = xnet.xnet2igraph(xnetpath)
+
+    mask = np.array(Image.open(maskpath))
+    if mask.ndim == 3:
+        mask = 0.299*mask[:, :, 0] + 0.587*mask[:, :, 1] + 0.114*mask[:, :, 2]
+    mask = np.where(mask > 128, 1, 0).astype(np.uint8)
+
+    shapes = rasterio.features.shapes(mask)
+    polygons = [shapely.geometry.Polygon(shape[0]["coordinates"][0]) for shape in shapes if shape[1] == 1]
+    ul = [rect[0], rect[1]]
+    lr = [rect[2] + 1, rect[3] + 1] # We want the lower right corner
+    latmax, lonmin = num2deg(ul[0], ul[1], 18)
+    latmin, lonmax = num2deg(lr[0], lr[1], 18)
+
+    info('g.vcount():{}'.format(g.vcount()))
+    majpolygon = polygons[np.argmax([p.area for p in polygons])]
+
+    xs, ys = np.array(g.vs['posx']), np.array(g.vs['posy'])
+
+    info('Identifying points inside the mask...')
+
+    pixcoords = np.ndarray((g.vcount(), 2), dtype=float)
+    inside = np.zeros(g.vcount(), dtype=bool)
+    for i in range(g.vcount()):
+        y1 = interp(ys[i], latmin, 0, latmax, mask.shape[0])
+        x1 = interp(xs[i], lonmin, 0, lonmax, mask.shape[1])
+        pixcoords[i, :] = x1, y1
+        p = shapely.geometry.Point([x1, y1])
+        inside[i] = majpolygon.contains(p)
+
+    info('Plotting...')
+    plt.figure(figsize=(16, 16))
+    plt.imshow(mask)
+    plt.scatter(pixcoords[:, 0][inside], pixcoords[:, 1][inside], c='k')
+    plt.savefig(pjoin(outdir, 'masked.png'))
+
+    g2 = g.induced_subgraph(np.where(inside)[0])
+    g3 = g2.components(mode='weak').giant()
+
+    figscale = .003
+    _, ax = plt.subplots(figsize=(mask.shape[1]*figscale, mask.shape[0]*figscale))
+    plot.plot_graph(g3, pjoin(outdir, 'map.png'), ax=ax)
+    pickle.dump(g3, open(pjoin(outdir, 'masked.pkl'), 'wb'))
+    xnet.igraph2xnet(g3, pjoin(outdir, 'graph.xnet'))
     return g3
 
 ##########################################################
