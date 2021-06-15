@@ -149,9 +149,8 @@ def get_geodesic_mask(realdist, lonref, latref, zoom, imgsize):
             if d < realdist: mask[i, j] = True
     return mask
 
-    b1 = interp(a1, a0, b0, a2, b2)
 ##########################################################
-def interp(a1, a0, b0, a2, b2):
+def interp(a1, a0, a2, b0, b2):
     """Linearly interpolate a1 to obtain b1 considering the simmetries
     a0,b0 and a2,b2"""
     # info(inspect.stack()[0][3] + '()')
@@ -185,8 +184,9 @@ def trim_graph(graphmlpath, maskpath, rect, outdir):
     pixcoords = np.ndarray((g.vcount(), 2), dtype=float)
     inside = np.zeros(g.vcount(), dtype=bool)
     for i in range(g.vcount()):
-        y1 = interp(ys[i], latmin, 0, latmax, mask.shape[0])
-        x1 = interp(xs[i], lonmin, 0, lonmax, mask.shape[1])
+        y1 = interp(ys[i], latmin, latmax, 0, mask.shape[0])
+        x1 = interp(xs[i], lonmin, lonmax, 0, mask.shape[1])
+        
         pixcoords[i, :] = x1, y1
         p = shapely.geometry.Point([x1, y1])
         inside[i] = majpolygon.contains(p)
@@ -202,7 +202,7 @@ def trim_graph(graphmlpath, maskpath, rect, outdir):
 
     figscale = .003
     _, ax = plt.subplots(figsize=(mask.shape[1]*figscale, mask.shape[0]*figscale))
-    plot.plot_graph(g3, pjoin(outdir, 'map.png'), ax=ax)
+    plot.plot_graph(g3, pjoin(outdir, 'map.png'), inverty=True, ax=ax)
     pickle.dump(g3, open(pjoin(outdir, 'masked.pkl'), 'wb'))
     return g3
 
@@ -236,15 +236,16 @@ def trim_xnet(xnetpath, maskpath, rect, outdir):
     pixcoords = np.ndarray((g.vcount(), 2), dtype=float)
     inside = np.zeros(g.vcount(), dtype=bool)
     for i in range(g.vcount()):
-        y1 = interp(ys[i], latmin, 0, latmax, mask.shape[0])
-        x1 = interp(xs[i], lonmin, 0, lonmax, mask.shape[1])
+        y1 = interp(ys[i], latmin, latmax, 0, mask.shape[0])
+        x1 = interp(xs[i], lonmin, lonmax, 0, mask.shape[1])
+
         pixcoords[i, :] = x1, y1
         p = shapely.geometry.Point([x1, y1])
         inside[i] = majpolygon.contains(p)
 
     info('Plotting...')
     plt.figure(figsize=(16, 16))
-    plt.imshow(mask)
+    plt.imshow(mask, origin='lower')
     plt.scatter(pixcoords[:, 0][inside], pixcoords[:, 1][inside], c='k')
     plt.savefig(pjoin(outdir, 'masked.png'))
 

@@ -12,7 +12,6 @@ rect = [102674,140018,102736,140103]
 bounds = pd.read_csv('/home/frodo/results/citydiffusion/20210415-mask2graph/bounds.csv', index_col='city')
 outroot = '/tmp/out/'
 
-# cities = ['FS', 'LO', 'RP', 'SJ', 'SO', 'UB']
 cities = ['FS', 'LO', 'RP', 'SJ', 'SO', 'UB']
 # cities = ['LO']
 for c in cities:
