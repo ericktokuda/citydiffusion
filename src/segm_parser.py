@@ -213,40 +213,51 @@ def trim_xnet(xnetpath, maskpath, rect, outdir):
     info(inspect.stack()[0][3] + '()')
     from myutils import xnet
     g = xnet.xnet2igraph(xnetpath)
+    info('g.vcount():{}'.format(g.vcount()))
+    vlons, vlats = np.array(g.vs['posx']), np.array(g.vs['posy'])
 
     mask = np.array(Image.open(maskpath))
+
     if mask.ndim == 3:
         mask = 0.299*mask[:, :, 0] + 0.587*mask[:, :, 1] + 0.114*mask[:, :, 2]
     mask = np.where(mask > 128, 1, 0).astype(np.uint8)
+    aux = np.where(mask)
+    print(np.mean(aux[0]), np.mean(aux[1]))
 
     shapes = rasterio.features.shapes(mask)
-    polygons = [shapely.geometry.Polygon(shape[0]["coordinates"][0]) for shape in shapes if shape[1] == 1]
-    ul = [rect[0], rect[1]]
-    lr = [rect[2] + 1, rect[3] + 1] # We want the lower right corner
+    polygons = [shapely.geometry.Polygon(shape[0]['coordinates'][0]) \
+            for shape in shapes if shape[1] == 1]
+    majpol = polygons[np.argmax([p.area for p in polygons])]
+    yy, xx = majpol.exterior.xy
+    majpolpts = xx, yy # Attention here because it invert x<->y
+    print(np.mean(majpolpts[0]), np.mean(majpolpts[1]))
+
+    ul = [rect[0], rect[1]] # Get latlon coordinates from the entire mask 
+    lr = [rect[2] + 1, rect[3] + 1]
     latmax, lonmin = num2deg(ul[0], ul[1], 18)
     latmin, lonmax = num2deg(lr[0], lr[1], 18)
 
-    info('g.vcount():{}'.format(g.vcount()))
-    majpolygon = polygons[np.argmax([p.area for p in polygons])]
+    a, b = majpolpts
+    newpts = np.zeros((len(a), 2), dtype=float)
+    for i in range(len(a)): # Convert mask polygon to latlon
+        newpts[i, :] = [interp(a[i], 0, mask.shape[0], latmax, latmin),
+                interp(b[i], 0, mask.shape[1], lonmin, lonmax)]
 
-    xs, ys = np.array(g.vs['posx']), np.array(g.vs['posy'])
+    pol = shapely.geometry.Polygon(newpts)
+    z = np.array(pol.exterior.xy)
 
     info('Identifying points inside the mask...')
 
-    pixcoords = np.ndarray((g.vcount(), 2), dtype=float)
     inside = np.zeros(g.vcount(), dtype=bool)
     for i in range(g.vcount()):
-        y1 = interp(ys[i], latmin, latmax, 0, mask.shape[0])
-        x1 = interp(xs[i], lonmin, lonmax, 0, mask.shape[1])
-
-        pixcoords[i, :] = x1, y1
-        p = shapely.geometry.Point([x1, y1])
-        inside[i] = majpolygon.contains(p)
+        inside[i] = pol.contains(shapely.geometry.Point([vlats[i], vlons[i]]))
 
     info('Plotting...')
-    plt.figure(figsize=(16, 16))
-    plt.imshow(mask, origin='lower')
-    plt.scatter(pixcoords[:, 0][inside], pixcoords[:, 1][inside], c='k')
+    plt.close(); plt.figure(figsize=(16, 16))
+    fig, ax = plt.subplots(figsize=(10,10))
+
+    ax.plot(newpts[:, 1],newpts[:, 0])
+    ax.scatter(vlons, vlats, c='red')
     plt.savefig(pjoin(outdir, 'masked.png'))
 
     g2 = g.induced_subgraph(np.where(inside)[0])
@@ -254,13 +265,17 @@ def trim_xnet(xnetpath, maskpath, rect, outdir):
 
     figscale = .003
     _, ax = plt.subplots(figsize=(mask.shape[1]*figscale, mask.shape[0]*figscale))
-    plot.plot_graph(g3, pjoin(outdir, 'map.png'), ax=ax)
+    plot.plot_graph(g3, pjoin(outdir, 'graph.png'), ax=ax)
     pickle.dump(g3, open(pjoin(outdir, 'masked.pkl'), 'wb'))
     xnet.igraph2xnet(g3, pjoin(outdir, 'graph.xnet'))
     return g3
 
 ##########################################################
 def main():
+    # import PIL.Image
+    # PIL.Image.MAX_IMAGE_PIXELS = 933120000
+    # trim_xnet('/home/posmac/keiji/temp/Sao_Carlos-Sao_Paulo-Brazil.xnet', '/home/posmac/keiji/temp/Sao_Carlos-Sao_Paulo-Brazil_mask.jpg', [96046, 147179, 96325,147632], '/tmp/')
+
     info(inspect.stack()[0][3] + '()')
     t0 = time.time()
     parser = argparse.ArgumentParser(description=__doc__)
