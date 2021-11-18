@@ -186,7 +186,7 @@ def trim_graph(graphmlpath, maskpath, rect, outdir):
     for i in range(g.vcount()):
         y1 = interp(ys[i], latmin, latmax, 0, mask.shape[0])
         x1 = interp(xs[i], lonmin, lonmax, 0, mask.shape[1])
-        
+
         pixcoords[i, :] = x1, y1
         p = shapely.geometry.Point([x1, y1])
         inside[i] = majpolygon.contains(p)
@@ -213,6 +213,7 @@ def trim_xnet(xnetpath, maskpath, rect, outdir):
     info(inspect.stack()[0][3] + '()')
     from myutils import xnet
     g = xnet.xnet2igraph(xnetpath)
+    plot.plot_graph(g, pjoin(outdir, 'graphorig.png'))
     info('g.vcount():{}'.format(g.vcount()))
     vlons, vlats = np.array(g.vs['posx']), np.array(g.vs['posy'])
 
@@ -222,7 +223,6 @@ def trim_xnet(xnetpath, maskpath, rect, outdir):
         mask = 0.299*mask[:, :, 0] + 0.587*mask[:, :, 1] + 0.114*mask[:, :, 2]
     mask = np.where(mask > 128, 1, 0).astype(np.uint8)
     aux = np.where(mask)
-    print(np.mean(aux[0]), np.mean(aux[1]))
 
     shapes = rasterio.features.shapes(mask)
     polygons = [shapely.geometry.Polygon(shape[0]['coordinates'][0]) \
@@ -230,7 +230,6 @@ def trim_xnet(xnetpath, maskpath, rect, outdir):
     majpol = polygons[np.argmax([p.area for p in polygons])]
     yy, xx = majpol.exterior.xy
     majpolpts = xx, yy # Attention here because it invert x<->y
-    print(np.mean(majpolpts[0]), np.mean(majpolpts[1]))
 
     ul = [rect[0], rect[1]] # Get latlon coordinates from the entire mask 
     lr = [rect[2] + 1, rect[3] + 1]
@@ -262,6 +261,7 @@ def trim_xnet(xnetpath, maskpath, rect, outdir):
 
     g2 = g.induced_subgraph(np.where(inside)[0])
     g3 = g2.components(mode='weak').giant()
+    # print('nvertices:', g.vcount(), g3.vcount())
 
     figscale = .003
     _, ax = plt.subplots(figsize=(mask.shape[1]*figscale, mask.shape[0]*figscale))
@@ -272,9 +272,42 @@ def trim_xnet(xnetpath, maskpath, rect, outdir):
 
 ##########################################################
 def main():
-    # import PIL.Image
-    # PIL.Image.MAX_IMAGE_PIXELS = 933120000
+    import PIL.Image
+    PIL.Image.MAX_IMAGE_PIXELS = 933120000
     # trim_xnet('/home/posmac/keiji/temp/Sao_Carlos-Sao_Paulo-Brazil.xnet', '/home/posmac/keiji/temp/Sao_Carlos-Sao_Paulo-Brazil_mask.jpg', [96046, 147179, 96325,147632], '/tmp/')
+    os.chdir('/tmp/novas/')
+    dirs = os.listdir('./')
+    res = dict(
+        Alagoinhas = [ 103060 , 139950,  103120 , 139998 ],
+        Barbacena  = [ 99170 , 146860, 99230 , 146919 ],
+        Birigui    = [ 94394 , 146915 , 94444 , 146969 ],
+        Camaragibe = [ 105560 , 136861,  105615 , 136944 ],
+        Caxias     = [ 93699 , 153223 ,  93933 , 153376 ],
+        Garanhuns  = [ 104393 , 137493,  104591 , 137718 ],
+        Itaborai   = [ 99777 , 148008 , 99939 , 148166 ],
+        JF         = [ 99397 , 147206 , 99568 , 147362 ],
+        Lages      = [ 94352 , 152101 , 94512 , 152252 ],
+    )
+
+    for d in dirs:
+        print('##########################################################')
+        print(d)
+        fff = {}
+        for f in os.listdir(d):
+            if '.xnet' in f:
+                fff['xnet'] = pjoin(d, f)
+            elif 'binaria' in f:
+                fff['bin'] = pjoin(d, f)
+            else:
+                fff['im'] = pjoin(d, f)
+
+        outdir = pjoin('/tmp/', d)
+        os.makedirs(outdir, exist_ok=True)
+        try:
+            trim_xnet(fff['xnet'], fff['bin'], res[d], outdir)
+        except Exception as e:
+            print(e)
+    return
 
     info(inspect.stack()[0][3] + '()')
     t0 = time.time()
