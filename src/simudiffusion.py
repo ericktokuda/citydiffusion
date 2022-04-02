@@ -16,20 +16,26 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 import PIL
 from PIL import Image
+import scipy
 from scipy.spatial import distance
 from scipy.signal import correlate2d, convolve2d
-from multiprocessing import Pool
 from scipy.stats import moment
-import scipy
+from scipy import signal, stats, ndimage
 import torch
 from torch.nn import functional as F
-from scipy import signal, stats
 import h5py
 import pandas as pd
 from myutils import info, create_readme, append_to_file
+import glob
 
 CUDA = torch.cuda.is_available()
 #CUDA=False
+
+#############################################################
+def diff2d_eq(r, D, t):
+    """2D isotropic diffusion equation"""
+    den = 4 * D * t
+    return np.exp(-np.power(r, 2) / den) / den / np.pi
 
 #############################################################
 def info(*args):
@@ -88,18 +94,36 @@ def conv_gpu(ker, map_):
     return imgout.cpu().numpy()[0][0]
 
 ##########################################################
-def store_data(zold, i, kerrad, outdir):
+def store_data(z, ztrimmed, i, outdir):
     """Store intermediate or just the final data"""
     outpath = pjoin(outdir, '{:03d}.png'.format(i))
-    r = kerrad
     fig = plt.figure(figsize=(20, 20))
-    plt.imshow(zold[r:-r,r:-r], cmap='gray');
+    # plt.imshow(z[r:-r,r:-r], cmap='gray');
+    plt.imshow(ztrimmed, cmap='gray');
     plt.savefig(outpath)
     plt.close()
 
     outpath = pjoin(outdir, '{:03d}.hdf5'.format(i))
     with h5py.File(outpath, "w") as f:
-        dset = f.create_dataset("data", data=zold[r:-r,r:-r], dtype='f')
+        dset = f.create_dataset("data", data=z, dtype='f')
+
+##########################################################
+def get_last_existing(labels, r, outdir):
+    origdir = os.getcwd()
+    os.chdir(outdir)
+    files = sorted(glob.glob('*.hdf5'))
+
+    if len(files) == 0:
+        store_data(labels, labels[r:-r,r:-r], 0, outdir)
+        return labels, 0
+
+    lastpath = files[-1]
+    fh = h5py.File(lastpath, 'r')
+    data = np.array(fh.get('data'))
+    fh.close()
+    os.chdir(origdir)
+    lastiter = int(lastpath.replace('.hdf5', ''))
+    return data, lastiter
 
 #############################################################
 def run_experiment(labels, diam, std, eps, maxiter, outfmt, outdir):
@@ -112,23 +136,38 @@ def run_experiment(labels, diam, std, eps, maxiter, outfmt, outdir):
     ker2d = ker2d / np.sum(ker2d) # normalization
     ker = (scipy.signal.gaussian(diam, std)).reshape(diam, 1)
     ker2d = np.dot(ker, ker.T) # separability of the kernel
+
+
+    D = 2.6E-5
+    m = diam
+    dist = np.ones((m, m), dtype=float)
+    dist[m//2, m//2] = 0
+    dist = ndimage.distance_transform_edt(dist)
+    # t = 1E6
+    t = 3600 * 24 * 10 # 10 days
+    ker2d = diff2d_eq(dist, D, t)
+
     ker2d = ker2d / np.sum(ker2d) # normalization
-    plt.imshow(ker2d)
+    plim = plt.imshow(ker2d)
+    plt.colorbar(plim)
     plt.savefig(pjoin(outdir, 'kernel.png'))
     plt.close()
 
-    zold = labels.copy() # Keep it due to the stopping criterion
-    for i in range(maxiter+1):
+    r = kerrad
+    zold, lastiter = get_last_existing(labels.copy(), r, outdir)
+
+    for i in range(lastiter, maxiter+1):
         info('i:{}'.format(i))
-        store_data(zold, i, kerrad, outdir)
 
         if CUDA: z =  conv_gpu(ker2d, zold)
         else: z = convolve2d(zold, ker2d, mode='same')
 
         z[np.where(labels == 1)] = 1 # Replacing source
+        store_data(z, z[r:-r,r:-r], i+1, outdir)
 
-        if i > 0 and np.linalg.norm(z - zold) < eps: break # stop criterion
-
+        change = np.linalg.norm(z - zold)
+        if i > 0 and change < eps: break # stop criterion
+        info('{:.02f}'.format(change))
         zold = z
 
     return i
@@ -145,6 +184,11 @@ def main():
     parser.add_argument('--outfmt', default='both', help='Output format (png,hdf5,both)')
     parser.add_argument('--outdir', default='/tmp/out/', help='Output directory')
     args = parser.parse_args()
+
+    if os.path.exists(pjoin(args.outdir, 'FINISHED')):
+        info('Already finished execution in output dir')
+        info('Aborting...')
+        return
 
     os.makedirs(args.outdir, exist_ok=True)
     readmepath = create_readme(sys.argv, args.outdir)
@@ -183,6 +227,7 @@ def main():
                               maxiter, args.outfmt, args.outdir)
     info('lastiter:{}'.format(lastiter))
     append_to_file(readmepath, 'lastiter:{}'.format(lastiter))
+    open(pjoin(args.outdir, 'FINISHED'), 'w').close()
 
     info('Elapsed time:{}'.format(time.time()-t0))
 
