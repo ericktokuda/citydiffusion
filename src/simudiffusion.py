@@ -139,13 +139,15 @@ def run_experiment(labels, diam, std, eps, maxiter, outfmt, outdir):
 
 
     D = 2.6E-5
+    C = 0.19072 # For tile size of size 32z32
     m = diam
     dist = np.ones((m, m), dtype=float)
     dist[m//2, m//2] = 0
     dist = ndimage.distance_transform_edt(dist)
+    realdist =  dist * C
     # t = 1E6
-    t = 3600 * 24 * 10 # 10 days
-    ker2d = diff2d_eq(dist, D, t)
+    t = 3600 * 24 # 1 day
+    ker2d = diff2d_eq(realdist, D, t)
 
     ker2d = ker2d / np.sum(ker2d) # normalization
     plim = plt.imshow(ker2d)
