@@ -181,6 +181,7 @@ def main():
     stepsat = -1
 
     for city in sorted(os.listdir(args.citiesdir)):
+        info('city:{}'.format(city))
         citydir = pjoin(args.citiesdir, city)
         if city.startswith('.') or not os.path.isdir(citydir): continue
         outdir = pjoin(args.outdir, city)
@@ -193,7 +194,7 @@ def main():
 
         for ii in [0, -1]: # Copy first and last images
             imgpath = pjoin(outdir, hdfpaths[ii].replace('.hdf5', '.png'))
-            if os.path.exists(lastimgpath): shutil.copy(lastimgpath, outdir)
+            if os.path.exists(imgpath): shutil.copy(imgpath, outdir)
 
         print_mean_and_min(hdfpaths)
 
